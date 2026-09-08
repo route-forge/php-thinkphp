@@ -1,0 +1,60 @@
+{
+    "name": "route-forge/thinkphp",
+    "description": "ThinkPHP named routes for SPA frontends: per-tier lazy loading via an HTTP metadata endpoint, an auto-discovery summary, TypeScript type generation, and zero-annotation route export. ThinkPHP adapter of the route-forge project.",
+    "license": "MIT",
+    "type": "library",
+    "homepage": "https://github.com/route-forge/php-thinkphp",
+    "authors": [
+        {
+            "name": "阿杰很厉害",
+            "email": "506907958@qq.com",
+            "homepage": "https://github.com/xyj2156"
+        }
+    ],
+    "keywords": [
+        "thinkphp",
+        "route",
+        "routes",
+        "routing",
+        "named-route",
+        "spa",
+        "tier",
+        "tiered-routing",
+        "lazy-loading",
+        "on-demand",
+        "metadata",
+        "typescript",
+        "types",
+        "api",
+        "vue",
+        "react",
+        "inertia",
+        "frontend",
+        "single-source-of-truth",
+        "php"
+    ],
+    "require": {
+        "php": "^8.2",
+        "route-forge/common": "^1.0",
+        "topthink/framework": "^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5 || ^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "RouteForge\\ThinkPHP\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RouteForge\\ThinkPHP\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --colors=always",
+        "test:coverage": "phpunit --coverage-text"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
