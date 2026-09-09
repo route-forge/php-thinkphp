@@ -69,6 +69,7 @@ php think route:forge:list [--level=manage] [--json] [--unassigned] [--aliases]
 php think route:forge:types [--level=admin] [--json] [--out=../frontend/src/types/forge-routes.d.ts]
 php think route:forge:clear [--level=manage]
 php think route:forge:publish [--force]   # copies default config into app config/forge.php
+php think route:forge:gen [--module=a,b|*] [--path=DIR] [--namespace=NS] [--dry-run]   # materialize auto-routed endpoints into explicit named routes
 ```
 
 ### Inline summary (server-rendered HTML fast path)
@@ -84,6 +85,7 @@ Global helper, usable in any template: `{:forge_summary()}` in `<head>` before t
 - Repeated `->forgeAlias()` calls **overwrite** (not merge): declare all aliases in one call.
 - No `/_forge/manager` visual panel in v1 (planned). No `route:clear` cascade linkage (ThinkPHP has no such command).
 - No ThinkPHP `vendor:publish`: `php think route:forge:publish` copies the default config; the other commands warn (and interactively offer to copy) when `config/forge.php` is missing.
+- `route:forge:gen` (ThinkPHP-only, adoption aid): materializes auto-routed endpoints (`/{controller}/{action}`, no rule written) into explicit named routes in a generated file (single-app `route/forge.auto.php`; multi-app `app/{module}/route/forge.auto.php`). Additive only — never deletes or rewrites existing rules; dangling entries (controller/method gone) are only reported; generated routes carry no tier (land in `unassigned` with a `->tier` TODO). Auto-detects single/multi app and rejects `--module` in single mode / requires explicit `--module` in multi mode. v1 scope: ordinary single-app controllers only; invokable/path-param/unusual `url_convert`/`action_suffix` are left to hand-authoring.
 - Command warnings go straight to `STDERR` (ThinkPHP console has no separate stderr output stream); stdout stays clean for `--json` / `--out` product piping.
 
 ## Conventions for agents working in this repo

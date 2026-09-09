@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### Added
+
+- **`route:forge:gen` 命令 + `AutoRouteScanner`**：把「当前可被 ThinkPHP 自动路由触达的端点」反向物化成**显式命名路由**，让习惯自动路由的项目低成本接入 route-forge。
+  - 单应用增量写入 `route/forge.auto.php`；多应用写各 `app/{模块}/route/forge.auto.php`（URI 不带模块前缀，对齐 MultiApp 剥离行为）。
+  - **只新增、绝不删除**：不动已写规则；删除是开发者的手；幂等可反复运行（已存在于实时路由表或生成文件里的名字跳过）。
+  - **悬空只提醒**：生成文件里指向已消失控制器/方法的条目仅报告，不清理。
+  - **不写 tier**：生成条目落 `unassigned`，留 `// ->tier('…') 待填` 注释。
+  - **防误用**：自动判定单/多应用——单应用禁 `--module`、多应用必须显式 `--module`（或 `*`），杜绝「悄悄扫全部」；提供 `--path` / `--namespace` 限定范围、`--dry-run` 预览。
+  - v1 边界：只自动生成常规单应用 `app/controller` 下「方法名即动作」的端点；invokable / 带路径参数 / 非常规 `url_convert`·`action_suffix` 交由人写并登记提示。
+
 ## [0.0.2] - 2026-09-09
 
 ### Added

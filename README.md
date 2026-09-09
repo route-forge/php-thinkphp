@@ -55,6 +55,27 @@ cp vendor/route-forge/thinkphp/config/forge.php config/forge.php
 
 未复制配置就运行 `route:forge:list` 等命令时，会给出 warning 并（交互终端下）询问是否立即复制，避免「忘了复制导致端点无数据」。
 
+## 从自动路由起步
+
+ThinkPHP 的长期习惯是**自动路由**（`/{控制器}/{操作}` 直接可达、不写 `Route::` 规则）。但 route-forge 的价值（分层、懒加载、TS 类型、按层级保护）**必须建立在可枚举的命名路由上**——自动路由产不出这些。为此提供 `route:forge:gen`：把「当前能被自动路由触达的端点」**反向物化成显式命名路由**，你在生成的文件上改即可，不必对着空白页从零写。
+
+```bash
+php think route:forge:gen              # 单应用：增量生成到 route/forge.auto.php
+php think route:forge:gen --dry-run    # 先看会新增/提醒什么，不落盘
+php think route:forge:gen --module=admin,api   # 多应用：只生成指定模块到 app/{模块}/route/forge.auto.php
+php think route:forge:gen --module=*           # 多应用：显式扫全部模块
+```
+
+语义刻意保守：
+
+- **只新增、绝不删除**——命令永远不动你已写的规则；删规则是你自己的事。
+- **幂等**——已在实时路由表、或已在生成文件里的名字自动跳过，可反复运行。
+- **悬空只提醒**——生成文件里某条的控制器/方法已不存在时，仅报告「可自行清理」，不改动。
+- **不写 tier**——生成条目先落 `unassigned`，留 `// ->tier('…') 待填` 注释，你按需分层。
+- **防误用**——自动判定单/多应用：单应用禁 `--module`；多应用必须显式给 `--module`（或 `*`），不会「悄悄扫全部」。
+
+边界（v1 如实说明）：自动生成**常规单应用 `app/controller` 下、方法名即动作**的端点；invokable 控制器、带路径参数、非常规 `url_convert`/`action_suffix` 的项目，命令只登记提示，交由你手写校验。切 `url_route_must=true`（强制路由）前，先 `route:forge:list` 核对覆盖，避免漏生成导致 404。
+
 ## 快速上手
 
 ### 定义路由层级
@@ -123,6 +144,9 @@ php think route:forge:clear
 
 # 发布默认配置到应用 config/forge.php（目标已存在默认跳过；--force 覆盖并自动备份）
 php think route:forge:publish
+
+# 从自动路由增量生成显式命名路由（详见「从自动路由起步」）
+php think route:forge:gen
 ```
 
 ### 路由别名（改名迁移 / 长期稳定对外名）

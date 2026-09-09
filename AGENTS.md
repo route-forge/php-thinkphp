@@ -26,7 +26,8 @@ ThinkPHP 8 适配包。框架无关业务逻辑全部在 `route-forge/common`（
 - `src/Support/OptionTypoScanner.php` — 扫描路由 option 里 `tier*`/`forge*` 形态的疑似拼错键（`->tiere()` 等被 `__call` 静默吞掉的产物），在 list/types 输出 warning；正常 think 选项不误报（保守前缀匹配）。
 - `src/Support/ConfigPublisher.php` — 把包内 `config/forge.php` 复制到应用 `config/forge.php`（`isPublished`/`publish(force)`；force 覆盖前备份 `.bak-{Ymd-His}`），替代 ThinkPHP 缺失的 vendor:publish。
 - `src/Console/Concerns/WarnsMissingConfig.php` — 三命令启动守卫：缺 `config/forge.php` 时，数据产物形态（`list --json` / `types`）只写 STDERR 不污染 stdout；人类可读形态（`list` 表格 / `clear`）打印 warning 并在交互终端 `confirm` 询问立即复制（非交互 `confirm` 返回默认 false，CI 不挂起、不读 STDIN）。
-- `src/Console/*` — `route:forge:list|types|clear|publish`；`execute` 覆写为 `$this->app->invoke([$this,'handle'])` 吃容器方法注入；命令内先 `event->trigger(RouteLoaded::class)` 加载路由文件（同 think 自带 `route:list`）。
+- `src/Console/*` — `route:forge:list|types|clear|publish|gen`；`execute` 覆写为 `$this->app->invoke([$this,'handle'])` 吃容器方法注入；命令内先 `event->trigger(RouteLoaded::class)` 加载路由文件（同 think 自带 `route:list`）。
+- `src/Support/AutoRouteScanner.php` — `route:forge:gen` 的扫描器：判定单/多应用模式、枚举可自动路由触达的「控制器+public 自有方法」，按 dispatch 逆推 URI/命名/目标（动作段=方法名原样、控制器段 `Str::snake`、子目录成路径段）。只增不删、悬空只提醒的语义在命令层实现。
 
 ## ThinkPHP 关键机制（易踩坑）
 
