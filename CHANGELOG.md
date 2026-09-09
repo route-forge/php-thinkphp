@@ -16,6 +16,14 @@
 
 - 文档「完整文档」入口由指向 `php-laravel/.docs` 统一改指 route-forge 文档站 <https://route-forge.github.io/docs/>（`config/forge.php` 头、README、llms.txt）；修正 README 中 `route-forge/common` 误链到 php-laravel 仓的问题。
 
+### Fixed（易用性审查）
+
+- `route:forge:types --out`：目标父目录不可创建或写入失败时**返回退出码 1 并报错**，不再假报「Written to」成功；成功时回显绝对路径。
+- `forge_summary()`：未注册 `ForgeService` 时抛出可操作提示（「请先注册 ForgeService」），不再冒容器「无法解析参数」天书堆栈。
+- `route:forge:list` / `types`：新增 **`->tier()`/`->forgeAlias()` 拼写告警**——扫描到 `->tiere()` / `->forgeAliases()` 这类被 `__call` 静默吞掉、不会生效的链式方法时给出 warning，提示正确写法（缓解零侵入 `__call` 设计的最大 DX 隐患）。
+- `--force` 备份文件名同秒冲突时追加序号（`.bak-{Ymd-His}-2`），不再覆盖上一个备份。
+- 缺配置守卫话术按命令产物区分（types 不再被笼统描述为「无数据」）。
+
 ## [0.0.1] - 2026-09-09
 
 ### Added
