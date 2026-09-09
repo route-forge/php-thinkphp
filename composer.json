@@ -44,7 +44,10 @@
     "autoload": {
         "psr-4": {
             "RouteForge\\ThinkPHP\\": "src/"
-        }
+        },
+        "files": [
+            "src/Support/functions.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -54,6 +57,13 @@
     "scripts": {
         "test": "phpunit --colors=always",
         "test:coverage": "phpunit --coverage-text"
+    },
+    "extra": {
+        "think": {
+            "services": [
+                "RouteForge\\ThinkPHP\\ForgeService"
+            ]
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true
