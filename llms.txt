@@ -93,6 +93,6 @@ Global helper, usable in any template: `{:forge_summary()}` in `<head>` before t
 
 ## Links
 
-- SPEC / DESIGN (framework-agnostic, authoritative): https://github.com/route-forge/php-laravel/tree/main/.docs
-- Shared core: `route-forge/common`
+- Docs site (framework-agnostic, authoritative — SPEC / DESIGN / install guides): https://route-forge.github.io/docs/
+- Shared core: `route-forge/common` (https://github.com/route-forge/php-common)
 - Frontend SDK: `@route-forge/core`

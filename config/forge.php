@@ -4,7 +4,7 @@
 // +----------------------------------------------------------------------
 // | ThinkPHP 无 vendor:publish，包安装后请将本文件复制到应用 config/forge.php
 // | 并按项目实际层级划分调整。字段语义与 route-forge/laravel 版一致，
-// | 完整文档见 https://github.com/route-forge/php-laravel/tree/main/.docs
+// | 完整文档见 route-forge 文档站 https://route-forge.github.io/docs/
 // +----------------------------------------------------------------------
 
 use think\facade\Env;

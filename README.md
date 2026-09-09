@@ -8,7 +8,7 @@ Route Forge 通过一个轻量的 HTTP 元信息端点把 ThinkPHP 的命名路�
 
 **语言 / Language:** 简体中文 · English *(planned)*
 
-> **面向 AI 助手 / 编码 Agent：** 本包为 [`route-forge/thinkphp`](https://packagist.org/packages/route-forge/thinkphp)。完整功能规格（框架无关部分）见 [`route-forge/php-laravel`](https://github.com/route-forge/php-laravel/tree/main/.docs) 的 SPEC 与 DESIGN 文档，ThinkPHP 差异见下方[「与 Laravel 版的差异」](#与-laravel-版的差异)。
+> **面向 AI 助手 / 编码 Agent：** 本包为 [`route-forge/thinkphp`](https://packagist.org/packages/route-forge/thinkphp)。完整功能规格（框架无关部分）见 [route-forge 文档站](https://route-forge.github.io/docs/)，ThinkPHP 差异见下方[「与 Laravel 版的差异」](#与-laravel-版的差异)。
 
 ## 解决什么问题
 
@@ -144,7 +144,7 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 
 ## 配置参考
 
-完整字段与 Laravel 版一致，见包内 `config/forge.php` 注释或 [php-laravel 文档 SPEC §5](https://github.com/route-forge/php-laravel/blob/main/.docs/SPEC.md)。核心项：
+完整字段与 Laravel 版一致，见包内 `config/forge.php` 注释或 [route-forge 文档站](https://route-forge.github.io/docs/)。核心项：
 
 | 键                   | 类型           | 默认值             | 说明                                                                 |
 |----------------------|----------------|--------------------|----------------------------------------------------------------------|
@@ -161,7 +161,7 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 
 ## 与 Laravel 版的差异
 
-核心业务逻辑（层级解析、别名、仓库、类型生成、缓存）全部在框架无关的 [`route-forge/common`](https://github.com/route-forge/php-laravel) 中，两端行为一致。ThinkPHP 侧的适配差异如实说明：
+核心业务逻辑（层级解析、别名、仓库、类型生成、缓存）全部在框架无关的 [`route-forge/common`](https://github.com/route-forge/php-common) 中，两端行为一致。ThinkPHP 侧的适配差异如实说明：
 
 | 能力 | Laravel 版 | ThinkPHP 版（本包） |
 |------|------------|---------------------|
