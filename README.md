@@ -172,10 +172,12 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 |----------------------|----------------|--------------------|----------------------------------------------------------------------|
 | `levels`             | `array`        | `[]`               | 层级定义表（description / match / load / endpoint_middleware）        |
 | `endpoint_prefix`    | `string`       | `'/_forge/routes'` | 元信息对外端点前缀                                                   |
+| `url_prefix`         | `string\|null` | `null`             | 应用路由前缀（完整 URL 或路径前缀），经摘要 `config.url_prefix` 下发；`null` 不下发 |
 | `endpoint_middleware`| `string[]`     | `[]`               | 摘要端点中间件                                                       |
 | `cache_ttl`          | `int\|null`    | `3600`             | 统一缓存 TTL（秒）；`null` 不缓存，`0` 永久缓存                       |
 | `cache_driver`       | `string\|null` | `null`             | think 缓存驱动（`file` / `redis` 等）；`null` 用默认驱动             |
 | `strict_mode`        | `bool`         | `false`            | 严格模式：未命中层级抛异常或归入 `unassigned`                        |
+| `scheme_version`     | `int`          | `1`                | 摘要端点 `schemeVersion`（格式版本，破坏性变更时递增）               |
 | `classifier`         | `callable\|null` | `null`           | 自定义分类回调 `fn(\think\route\RuleItem $r): ?string`               |
 | `aliases`            | `array`        | `[]`               | 别名映射表（键=别名，值=真实路由名）                                 |
 
