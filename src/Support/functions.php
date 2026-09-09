@@ -29,8 +29,17 @@ if (!function_exists('forge_summary')) {
      */
     function forge_summary(): string
     {
-        $repository = \think\Container::getInstance()->make(CommonRouteRepository::class);
+        $container = \think\Container::getInstance();
 
-        return SummaryRenderer::render($repository->getSummary());
+        // 未注册 ForgeService 时容器无法解析出 RouteRepository（其构造依赖接口+可迭代集合），
+        // 与其抛「cannot resolve parameter」栈，不如直接给可操作的提示
+        if (!$container->bound(CommonRouteRepository::class)) {
+            throw new \RuntimeException(
+                'forge_summary() 不可用：请先注册 RouteForge\ThinkPHP\ForgeService'
+                . '（composer 自动发现，或在 app/service.php 追加该服务类）。',
+            );
+        }
+
+        return SummaryRenderer::render($container->make(CommonRouteRepository::class)->getSummary());
     }
 }

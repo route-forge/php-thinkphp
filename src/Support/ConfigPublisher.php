@@ -65,8 +65,11 @@ final class ConfigPublisher
 
         $backup = null;
         if (is_file($target)) {
-            // force 覆盖前备份，保留用户既有改动可回退
+            // force 覆盖前备份，保留用户既有改动可回退；同秒重复 force 时追加序号避免覆盖备份
             $backup = $target . '.bak-' . date('Ymd-His');
+            for ($i = 2; is_file($backup); $i++) {
+                $backup = $target . '.bak-' . date('Ymd-His') . '-' . $i;
+            }
             if (!copy($target, $backup)) {
                 throw new RuntimeException('备份现有 config/forge.php 失败：' . $target);
             }

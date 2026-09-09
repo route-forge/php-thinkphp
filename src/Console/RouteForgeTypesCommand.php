@@ -43,7 +43,7 @@ class RouteForgeTypesCommand extends Command
     public function handle(Input $input, Output $output, RouteAnalyzer $analyzer, ThinkRouteNormalizer $normalizer): int
     {
         // types 的 stdout 恒为产物（d.ts / JSON），缺配置只走 STDERR 指路，不污染产物
-        $this->guardConfigPublished($input, $output, true);
+        $this->guardConfigPublished($input, $output, true, 'TS 类型声明');
 
         // 命令流中路由文件尚未加载（think RouteList 同款姿势），触发加载
         $this->app->event->trigger(\think\event\RouteLoaded::class);
@@ -60,17 +60,20 @@ class RouteForgeTypesCommand extends Command
         }
 
         try {
-            $analysis = $analyzer->analyzeRoutes(
-                new \RouteForge\ThinkPHP\Support\ThinkRouteCollection(
-                    new \RouteForge\ThinkPHP\Support\RouteCollector($this->app->route),
-                ),
-                $normalizer,
+            $collection = new \RouteForge\ThinkPHP\Support\ThinkRouteCollection(
+                new \RouteForge\ThinkPHP\Support\RouteCollector($this->app->route),
             );
+            $analysis = $analyzer->analyzeRoutes($collection, $normalizer);
         } catch (ForgeExceptionContract $e) {
             $output->writeln("<error>[{$e->code()}] {$e->getMessage()}</error>");
 
             return 1;
         }
+
+        $warnings = array_merge(
+            $analysis['warnings'],
+            \RouteForge\ThinkPHP\Support\OptionTypoScanner::scan($collection),
+        );
 
         // 目标层级：全部已配置层级（--level 时仅该层级），空层级由
         // TypeGenerator::collectTargets() 预置，保证 ForgeLevel 联合类型完整
@@ -91,16 +94,25 @@ class RouteForgeTypesCommand extends Command
 
         // 警告走 STDERR：think Output 无独立 stderr 流，直写 STDERR 常量，
         // 保证 stdout 产物纯净（--json 管道消费 / 无 --out 重定向不被污染）
-        $this->printWarnings($analysis['warnings']);
+        $this->printWarnings($warnings);
 
         $outFile = $input->getOption('out');
         if ($outFile !== null && $outFile !== '') {
             $dir = dirname($outFile);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
+            if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+                $output->writeln("<error>无法创建输出目录：{$dir}</error>");
+
+                return 1;
             }
-            file_put_contents($outFile, $outputContent);
-            $output->writeln("<info>Written to: {$outFile}</info>");
+
+            if (file_put_contents($outFile, $outputContent) === false) {
+                $output->writeln("<error>写入失败（权限/磁盘？）：{$outFile}</error>");
+
+                return 1;
+            }
+
+            $abs = realpath($outFile) ?: $outFile;
+            $output->writeln("<info>Written to: {$abs}</info>");
 
             return 0;
         }

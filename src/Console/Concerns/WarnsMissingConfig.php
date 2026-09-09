@@ -22,14 +22,14 @@ use think\console\Output;
  */
 trait WarnsMissingConfig
 {
-    protected function guardConfigPublished(Input $input, Output $output, bool $stdoutIsProduct): void
+    protected function guardConfigPublished(Input $input, Output $output, bool $stdoutIsProduct, string $artifact = '层级元信息'): void
     {
         $publisher = new ConfigPublisher($this->app);
         if ($publisher->isPublished()) {
             return;
         }
 
-        $notice = '未检测到 config/forge.php：Route Forge 尚未配置，层级端点/本命令将无数据。';
+        $notice = "未检测到 config/forge.php：Route Forge 尚未配置，{$artifact}将为空。";
         $howto  = '复制默认配置：php think route:forge:publish';
 
         if ($stdoutIsProduct) {

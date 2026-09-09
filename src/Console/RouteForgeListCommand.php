@@ -66,12 +66,10 @@ class RouteForgeListCommand extends Command
         }
 
         try {
-            $analysis = $analyzer->analyzeRoutes(
-                new \RouteForge\ThinkPHP\Support\ThinkRouteCollection(
-                    new \RouteForge\ThinkPHP\Support\RouteCollector($this->app->route),
-                ),
-                $normalizer,
+            $collection = new \RouteForge\ThinkPHP\Support\ThinkRouteCollection(
+                new \RouteForge\ThinkPHP\Support\RouteCollector($this->app->route),
             );
+            $analysis = $analyzer->analyzeRoutes($collection, $normalizer);
         } catch (ForgeExceptionContract $e) {
             // 悬空别名 / resolve 抛出的 Forge 系异常：输出 [错误码] 消息而非裸堆栈
             $output->writeln("<error>[{$e->code()}] {$e->getMessage()}</error>");
@@ -79,7 +77,10 @@ class RouteForgeListCommand extends Command
             return 1;
         }
 
-        $warnings = $analysis['warnings'];
+        $warnings = array_merge(
+            $analysis['warnings'],
+            \RouteForge\ThinkPHP\Support\OptionTypoScanner::scan($collection),
+        );
         $aliases  = $analysis['aliases'];
         $rows     = $analyzer->filterRows($analysis['rows'], $filterLevel, $onlyUnassigned, $onlyAliases);
         $payload  = $analyzer->listPayload($levels, $rows, $analysis['tier_counts'], $warnings, $filterLevel, $onlyUnassigned, $onlyAliases);
