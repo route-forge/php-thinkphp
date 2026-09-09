@@ -11,6 +11,7 @@
 
 - **`route:forge:publish` 命令**：ThinkPHP 无 `vendor:publish`，此命令把包内默认 `config/forge.php` 复制到应用 `config/forge.php`，替代「开发者手动复制」。目标已存在时默认跳过不覆盖；`--force` 覆盖前自动备份为 `forge.php.bak-{Ymd-His}`。
 - **缺配置守卫**：`route:forge:list` / `types` / `clear` 启动时检测 `config/forge.php` 是否已发布；未发布则提示——人类可读输出（list 表格 / clear）在交互终端 `confirm` 询问是否立即复制，数据产物形态（`list --json` / `types` 的 d.ts/JSON）仅写 STDERR，绝不污染 `--json` / 重定向的 stdout 管道。CI / 非交互环境 `confirm` 返回默认值，不挂起、不读 STDIN。
+- **dev-only IDE 提示桩 `_ide_helper.php`**：对 `think\route\Rule` 贴 `@method tier()/forgeAlias()`，补全经 `__call` 的魔术链式方法。不进 composer autoload，仅供 IDE 索引。
 
 ### Changed
 

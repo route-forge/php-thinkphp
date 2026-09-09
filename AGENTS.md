@@ -31,6 +31,7 @@ ThinkPHP 8 适配包。框架无关业务逻辑全部在 `route-forge/common`（
 ## ThinkPHP 关键机制（易踩坑）
 
 - **无宏系统**：`Rule::__call` 把未知链式方法转成 `setOption(方法名, 值)`。`->tier('x')` / `->forgeAlias(...)` / 分组链式 `->tier()` 全部白嫖此机制落到 option。副作用：定义期不校验层级合法性（扫描期由 `TierResolver` 抛 `UnknownLevelException`）；多次 `->forgeAlias()` 是**覆盖**非合并。
+- **零侵入的两处兜底**：拼错的链式方法（`->tiere()` 等）被 `__call` 静默吞掉 → `OptionTypoScanner` 在 list/types 扫 `tier*`/`forge*` 疑似拼错键给 warning；IDE 无补全 → 包根 `_ide_helper.php`（dev-only，**不得进 autoload/require**，否则与真实 `think\route\Rule` 冲突）贴 `@method`。改了 `->tier()/->forgeAlias()` 的签名/语义时，`_ide_helper.php`、`llms.txt`、README 的 IDE 小节须一并同步。
 - **分组选项动态合并**：`Rule::getOption()` 读时把父组 option `array_merge` 进来、子覆盖父 → 「内层覆盖外层 / 显式覆盖分组」天然成立。`forgeAlias`/`tier` 不在 `mergeOptions` 白名单（只有 `model/append/middleware` 深合并），故为整体覆盖语义。
 - **命名路由甄别**：`RuleGroup::addRule` 里 `$name = is_string($route) ? $route : null` → 未 `->name()` 的路由 `getName()` 返回路由地址字符串。判定「显式命名」= name 非空 **且 ≠ 路由地址字符串**。
 - **HTTP 测试**：`$app->http->run($request)` 返回 `Response`（不 echo）；`Request` 用 `setPathinfo()`（**不带前导 `/`**，与生产 pathinfo 解析一致）+ `setMethod()`。

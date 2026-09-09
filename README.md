@@ -153,6 +153,17 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 
 输出一段 `<script>`，以一次性、消费即自删、不可枚举的 `window.__ROUTE_FORGE__` 访问器暴露摘要，`@route-forge/core` 读取后跳过首屏的摘要 HTTP 往返。XSS 安全编码，`</script>` 无法截断脚本块。
 
+### IDE 智能提示
+
+`->tier()` / `->forgeAlias()` 经 ThinkPHP 的 `__call` 魔术方法落到路由 option，类里没有真实声明，IDE 默认不会对它们补全。包根附带一份 **dev-only** 提示桩 `_ide_helper.php`（对 `think\route\Rule` 贴 `@method`）：
+
+- PHPStorm 等会自动索引它，从而让 `->tier('...')` 有补全/跳转；
+- 该文件**不在 composer autoload 内**，切勿 `require` 或加入自动加载（否则与真实类冲突）；
+- 若 IDE 未识别，把包根目录加入 Settings → PHP 的 Include Path；
+- 属可选便利，ThinkPHP 若原生新增同名方法请自行忽略或删除该桩。
+
+运行时对拼错的链式方法（如 `->tiere()`）另有兜底：`route:forge:list` / `types` 会给出拼写告警。
+
 ## 配置参考
 
 完整字段与 Laravel 版一致，见包内 `config/forge.php` 注释或 [route-forge 文档站](https://route-forge.github.io/docs/)。核心项：
