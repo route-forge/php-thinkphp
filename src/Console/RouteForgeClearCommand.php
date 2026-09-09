@@ -6,6 +6,7 @@ namespace RouteForge\ThinkPHP\Console;
 
 use RouteForge\Common\Cache\RouteCache;
 use RouteForge\Common\Repository\RouteRepository;
+use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
@@ -18,6 +19,8 @@ use think\console\Output;
  */
 class RouteForgeClearCommand extends Command
 {
+    use WarnsMissingConfig;
+
     protected function configure(): void
     {
         $this->setName('route:forge:clear')
@@ -32,6 +35,9 @@ class RouteForgeClearCommand extends Command
 
     public function handle(Input $input, Output $output, RouteCache $cache): int
     {
+        // 人类可读输出，缺配置时交互式提示复制
+        $this->guardConfigPublished($input, $output, false);
+
         $level = $input->getOption('level');
 
         if ($level !== null && $level !== '') {

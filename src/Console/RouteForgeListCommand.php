@@ -7,6 +7,7 @@ namespace RouteForge\ThinkPHP\Console;
 use RouteForge\Common\Analyzer\RouteAnalyzer;
 use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
+use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
@@ -24,6 +25,8 @@ use think\console\Output;
  */
 class RouteForgeListCommand extends Command
 {
+    use WarnsMissingConfig;
+
     protected function configure(): void
     {
         $this->setName('route:forge:list')
@@ -41,6 +44,9 @@ class RouteForgeListCommand extends Command
 
     public function handle(Input $input, Output $output, RouteAnalyzer $analyzer, ThinkRouteNormalizer $normalizer): int
     {
+        // config/forge.php 未发布时：json 形态只 STDERR 指路，table 形态交互式提示复制
+        $this->guardConfigPublished($input, $output, (bool) $input->getOption('json'));
+
         // 命令流中路由文件尚未加载（think RouteList 同款姿势），触发加载
         $this->app->event->trigger(\think\event\RouteLoaded::class);
 

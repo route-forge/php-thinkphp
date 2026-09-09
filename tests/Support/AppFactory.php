@@ -23,10 +23,10 @@ final class AppFactory
      */
     private static array $roots = [];
 
-    public static function create(bool $debug = false, array $forgeOverrides = [], ?\Closure $classifier = null, bool $lazyRoute = false): App
+    public static function create(bool $debug = false, array $forgeOverrides = [], ?\Closure $classifier = null, bool $lazyRoute = false, bool $writeForgeConfig = true): App
     {
         $root = self::makeRoot();
-        self::writeConfigs($root, $debug, $forgeOverrides, $lazyRoute);
+        self::writeConfigs($root, $debug, $forgeOverrides, $lazyRoute, $writeForgeConfig);
 
         $app = new App($root);
         $app->initialize();
@@ -38,7 +38,7 @@ final class AppFactory
 
         // classifier 闭包无法序列化进配置文件，经内存 Config 注入
         // （ForgeService::register 在此之后执行，读到的即是内存值）
-        if ($classifier !== null) {
+        if ($classifier !== null && is_array($app->config->get('forge'))) {
             $forge = $app->config->get('forge');
             $forge['classifier'] = $classifier;
             $app->config->set(['forge' => $forge]);
@@ -73,7 +73,7 @@ final class AppFactory
         return $root;
     }
 
-    private static function writeConfigs(string $root, bool $debug, array $forgeOverrides, bool $lazyRoute = false): void
+    private static function writeConfigs(string $root, bool $debug, array $forgeOverrides, bool $lazyRoute = false, bool $writeForgeConfig = true): void
     {
         $put = static function (string $rel, string $content) use ($root): void {
             file_put_contents($root . DIRECTORY_SEPARATOR . $rel, $content);
@@ -90,6 +90,11 @@ final class AppFactory
 
         // forge 配置：测试内联默认（不经包 config/forge.php——其中 Env facade
         // 依赖已 boot 的容器）+ 测试覆盖（浅合并，levels 覆盖需整体替换）
+        if (!$writeForgeConfig) {
+            // 模拟「开发者尚未复制配置」场景：不写 config/forge.php
+            return;
+        }
+
         $forge = array_merge([
             'levels'              => [],
             'endpoint_prefix'     => '/_forge/routes',

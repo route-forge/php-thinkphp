@@ -20,7 +20,9 @@ use RouteForge\ThinkPHP\Adapter\ThinkCacheAdapter;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
 use RouteForge\ThinkPHP\Console\RouteForgeClearCommand;
 use RouteForge\ThinkPHP\Console\RouteForgeListCommand;
+use RouteForge\ThinkPHP\Console\RouteForgePublishCommand;
 use RouteForge\ThinkPHP\Console\RouteForgeTypesCommand;
+use RouteForge\ThinkPHP\Support\ConfigPublisher;
 use RouteForge\ThinkPHP\Support\ThinkRouteCollection;
 use RouteForge\ThinkPHP\Support\RouteCollector;
 use think\App;
@@ -36,7 +38,7 @@ use think\Service;
  * 对应 Laravel 版 ForgeServiceProvider 的职责裁剪（v1 范围）：
  *   - 绑定 common 层服务（RouteCache / TierResolver / RouteAnalyzer / RouteRepository）；
  *   - 注册元信息端点 GET /{endpoint_prefix}/{level} 与摘要端点 GET /{endpoint_prefix}；
- *   - 注册 route:forge:list / types / clear 三个 think console 命令；
+ *   - 注册 route:forge:list / types / clear / publish 四个 think console 命令；
  *   - 内嵌摘要经全局 helper forge_summary()（模板中 {:forge_summary()} 使用）。
  *
  * 零侵入说明：ThinkPHP 无宏机制，->tier() / ->forgeAlias() 走 Rule::__call
@@ -62,6 +64,7 @@ class ForgeService extends Service
             RouteForgeListCommand::class,
             RouteForgeTypesCommand::class,
             RouteForgeClearCommand::class,
+            RouteForgePublishCommand::class,
         ]);
     }
 
@@ -70,6 +73,8 @@ class ForgeService extends Service
      */
     protected function registerBindings(): void
     {
+        // 配置发布器（route:forge:publish 与三命令的缺配置守卫共用同一实例）
+        $this->app->instance(ConfigPublisher::class, new ConfigPublisher($this->app));
         $this->app->instance(CommonRouteCache::class, $this->makeRouteCache());
         $this->app->instance(CommonTierResolver::class, $this->makeTierResolver());
         $this->app->instance(RouteAnalyzer::class, $this->makeRouteAnalyzer());

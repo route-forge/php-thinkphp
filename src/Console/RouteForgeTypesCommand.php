@@ -9,6 +9,7 @@ use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\Common\Repository\RouteRepository;
 use RouteForge\Common\Type\TypeGenerator;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
+use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
@@ -23,6 +24,8 @@ use think\console\Output;
  */
 class RouteForgeTypesCommand extends Command
 {
+    use WarnsMissingConfig;
+
     protected function configure(): void
     {
         $this->setName('route:forge:types')
@@ -39,6 +42,9 @@ class RouteForgeTypesCommand extends Command
 
     public function handle(Input $input, Output $output, RouteAnalyzer $analyzer, ThinkRouteNormalizer $normalizer): int
     {
+        // types 的 stdout 恒为产物（d.ts / JSON），缺配置只走 STDERR 指路，不污染产物
+        $this->guardConfigPublished($input, $output, true);
+
         // 命令流中路由文件尚未加载（think RouteList 同款姿势），触发加载
         $this->app->event->trigger(\think\event\RouteLoaded::class);
 
