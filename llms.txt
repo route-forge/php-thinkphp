@@ -1,0 +1,98 @@
+# Route Forge for ThinkPHP
+
+> The ThinkPHP adapter of the route-forge project: exposes ThinkPHP named routes to a Vue / React / Inertia SPA through a per-tier, lazy-loadable HTTP metadata endpoint, and generates TypeScript types from the real route rule tree — no hardcoded frontend URLs, no shipping the whole route table, no annotations. Composer package: `route-forge/thinkphp`.
+
+## What it is
+
+Route Forge is a ThinkPHP 8 package (`route-forge/thinkphp`, PHP ^8.2, topthink/framework ^8.0, MIT). It reads ThinkPHP's own route rule tree, assigns each **explicitly named** route to a **tier** you define, and serves the metadata over HTTP so a separately-deployed frontend can build URLs and load only the routes it currently needs.
+
+All framework-agnostic business logic (tier resolution, aliases, repository, caching, TS type generation) lives in the shared core package the Laravel adapter also uses. This package only adapts ThinkPHP's routing primitives to that core. It is a **zero-invasive** adapter: it does not subclass or rebind ThinkPHP's `Route`/`RuleGroup`/`RuleItem`.
+
+It is the authoritative backend counterpart to the frontend SDKs `@route-forge/core`, `@route-forge/vue`, and `@route-forge/react` (separate repository). The backend owns config; the client discovers it at runtime.
+
+## When to reach for it
+
+- A ThinkPHP API is consumed by a SPA or mobile web app whose HTML is **not** rendered by ThinkPHP.
+- The named-route set is large enough that exporting all of it to the client is wasteful; you want **on-demand, per-tier loading**.
+- You want **one source of truth** for route names/params shared between backend and frontend, with **TypeScript types** generated from the real route table.
+
+## Install
+
+```bash
+composer require route-forge/thinkphp
+cp vendor/route-forge/thinkphp/config/forge.php config/forge.php
+```
+
+The `ForgeService` is auto-discovered via composer `extra.think.services`. If auto-discovery is off, add `\RouteForge\ThinkPHP\ForgeService::class` to `app/service.php`.
+
+## Core API
+
+### Assign tiers (three interchangeable, composable channels)
+
+```php
+use think\facade\Route;
+
+// 1. explicit on the route (rides on think Rule::__call → route option, zero-invasive)
+Route::get('auth/login', 'Auth@login')->name('auth.login')->tier('public');
+
+// 2. group passthrough (nested groups: inner overrides outer)
+Route::group('manage', function () {
+    Route::get('users', 'ManageUser@index')->name('manage.users.index');
+})->tier('manage');
+
+// 3. config-driven batch match in config/forge.php (prefix / middleware / any|all|DNF)
+```
+
+Priority (high → low): explicit `->tier()` > group passthrough > `classifier` callback > config match > `unassigned` fallback.
+
+### Aliases
+
+```php
+Route::get('manage/members', 'Member@index')
+    ->name('admin.members.index')->tier('manage')
+    ->forgeAlias('admin.users.index'); // declare all aliases in ONE call (option overwrite semantics)
+```
+
+### Endpoints
+
+```text
+GET /_forge/routes/{level}   # per-tier metadata (name + URI + methods + params)
+GET /_forge/routes           # summary: all tiers + global config, for client auto-discovery
+```
+
+### Commands (think console)
+
+```bash
+php think route:forge:list [--level=manage] [--json] [--unassigned] [--aliases]
+php think route:forge:types [--level=admin] [--json] [--out=../frontend/src/types/forge-routes.d.ts]
+php think route:forge:clear [--level=manage]
+```
+
+### Inline summary (server-rendered HTML fast path)
+
+Global helper, usable in any template: `{:forge_summary()}` in `<head>` before the bundle. Emits a one-shot, self-deleting, non-enumerable `window.__ROUTE_FORGE__` accessor so `@route-forge/core` skips the first summary HTTP round-trip.
+
+## ThinkPHP-specific differences from the Laravel adapter (be honest about these)
+
+- `->tier()` level validation happens at **scan time**, not definition time (ThinkPHP has no macro system; `->tier()` rides on `__call` → route option).
+- A route is "named" only when explicitly `->name(...)`-ed AND its name differs from the route address string; ThinkPHP otherwise uses the address string as the default identifier, which this package treats as **unnamed** (excluded from metadata).
+- `url_lazy_route=true` is **not supported** (scanning would be incomplete) → endpoints/commands fail fast with a clear message.
+- Resource routes (`Route::resource`) generate unnamed rules → they do not appear in metadata; write individual named routes when you need metadata.
+- Repeated `->forgeAlias()` calls **overwrite** (not merge): declare all aliases in one call.
+- No `/_forge/manager` visual panel in v1 (planned). No `route:clear` cascade linkage (ThinkPHP has no such command).
+- Command warnings go straight to `STDERR` (ThinkPHP console has no separate stderr output stream); stdout stays clean for `--json` / `--out` product piping.
+
+## Conventions for agents working in this repo
+
+- RouteInfo contract conversions the adapter MUST perform: `<id>`/`<id?>` → `{id}`/`{id?}`; method `'*'` → full method set; GET gets HEAD appended (Laravel parity); `option['middleware']` tuples flattened to class strings.
+- `RouteCache` TTL: think cache uses `0 = forever`, so the adapter maps common's `null` → `set(..., 0)` (never pass `null` to think `set()`, that means "default expire").
+- Framework-internal route name excluded from every scan: `__think_auto_route__` (in addition to the shared `forge.routes.*` / `forge.manager.*` prefixes).
+- Tests build a minimal ThinkPHP app via `tests/Support/AppFactory.php` (no skeleton dependency). Temp dirs default to `F:\tmp` (override with `RF_TEST_TMP`); CI falls back to system temp. `.env` debug uses `APP_DEBUG=0/1` only — the string `false` is truthy to ThinkPHP's env parser.
+- Do NOT commit the local `repositories` (path) block in `composer.json`; it is dev-only linkage to `php-common`. Necessary committed changes to `composer.json` are limited to `autoload.files` and `extra.think.services`.
+- Commit style: `type(thinkphp): 中文描述`; run the full suite green before any commit; never push without explicit instruction.
+
+## Links
+
+- SPEC / DESIGN (framework-agnostic, authoritative): https://github.com/route-forge/php-laravel/tree/main/.docs
+- Shared core: `route-forge/common`
+- Frontend SDK: `@route-forge/core`
