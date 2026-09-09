@@ -1,0 +1,116 @@
+<?php
+
+declare(strict_types=1);
+
+namespace RouteForge\ThinkPHP\Console;
+
+use RouteForge\Common\Analyzer\RouteAnalyzer;
+use RouteForge\Common\Contract\ForgeExceptionContract;
+use RouteForge\Common\Repository\RouteRepository;
+use RouteForge\Common\Type\TypeGenerator;
+use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
+use think\console\Command;
+use think\console\Input;
+use think\console\input\Option;
+use think\console\Output;
+
+/**
+ * 从路由表生成 TS 类型声明。
+ *
+ * 对齐 Laravel 版 route:forge:types（SPEC §3.2）：--level / --json / --out。
+ * think 差异：console 无独立 stderr，警告在产物前同流输出（--out 时文件
+ * 内容仍纯净，警告仅出现在控制台）。
+ */
+class RouteForgeTypesCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this->setName('route:forge:types')
+            ->addOption('level', null, Option::VALUE_REQUIRED, '仅生成指定层级下的路由类型')
+            ->addOption('json', null, Option::VALUE_NONE, '输出 JSON 对象格式（键为路由名）')
+            ->addOption('out', null, Option::VALUE_REQUIRED, '写入指定文件路径；不传则输出到 stdout')
+            ->setDescription('生成 TS 路由类型声明（route:forge:types --level=admin --json --out=src/types/forge-routes.d.ts）');
+    }
+
+    protected function execute(Input $input, Output $output)
+    {
+        return $this->app->invoke([$this, 'handle'], [$input, $output]);
+    }
+
+    public function handle(Input $input, Output $output, RouteAnalyzer $analyzer, ThinkRouteNormalizer $normalizer): int
+    {
+        // 命令流中路由文件尚未加载（think RouteList 同款姿势），触发加载
+        $this->app->event->trigger(\think\event\RouteLoaded::class);
+
+        $levels      = array_keys((array) $this->app->config->get('forge.levels', []));
+        $filterLevel = $input->getOption('level');
+
+        // level 过滤校验
+        if ($filterLevel !== null && $filterLevel !== '' && !in_array($filterLevel, $levels, true)) {
+            $output->writeln("<error>Unknown level: {$filterLevel}</error>");
+            $output->writeln('Available levels: ' . (empty($levels) ? '(none)' : implode(', ', $levels)));
+
+            return 1;
+        }
+
+        try {
+            $analysis = $analyzer->analyzeRoutes(
+                new \RouteForge\ThinkPHP\Support\ThinkRouteCollection(
+                    new \RouteForge\ThinkPHP\Support\RouteCollector($this->app->route),
+                ),
+                $normalizer,
+            );
+        } catch (ForgeExceptionContract $e) {
+            $output->writeln("<error>[{$e->code()}] {$e->getMessage()}</error>");
+
+            return 1;
+        }
+
+        // 目标层级：全部已配置层级（--level 时仅该层级），空层级由
+        // TypeGenerator::collectTargets() 预置，保证 ForgeLevel 联合类型完整
+        $typeGenerator = new TypeGenerator();
+        $targets       = $filterLevel !== null && $filterLevel !== '' ? [$filterLevel] : $levels;
+        $routesByLevel = $typeGenerator->collectTargets($analysis['rows'], $targets);
+
+        // 输出
+        if ((bool) $input->getOption('json')) {
+            $outputContent = $typeGenerator->generateJson($routesByLevel);
+        } else {
+            // 端点注释取实际配置，规范化与端点注册/摘要下发共用同一实现
+            $endpointPrefix = RouteRepository::normalizeEndpointPrefix(
+                (string) $this->app->config->get('forge.endpoint_prefix', '/_forge/routes'),
+            );
+            $outputContent = $typeGenerator->generateDts($routesByLevel, $endpointPrefix);
+        }
+
+        // 警告走 STDERR：think Output 无独立 stderr 流，直写 STDERR 常量，
+        // 保证 stdout 产物纯净（--json 管道消费 / 无 --out 重定向不被污染）
+        $this->printWarnings($analysis['warnings']);
+
+        $outFile = $input->getOption('out');
+        if ($outFile !== null && $outFile !== '') {
+            $dir = dirname($outFile);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            file_put_contents($outFile, $outputContent);
+            $output->writeln("<info>Written to: {$outFile}</info>");
+
+            return 0;
+        }
+
+        $output->writeln($outputContent);
+
+        return 0;
+    }
+
+    /**
+     * @param string[] $warnings
+     */
+    private function printWarnings(array $warnings): void
+    {
+        foreach ($warnings as $warning) {
+            fwrite(STDERR, $warning . PHP_EOL);
+        }
+    }
+}
