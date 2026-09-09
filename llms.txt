@@ -20,10 +20,12 @@ It is the authoritative backend counterpart to the frontend SDKs `@route-forge/c
 
 ```bash
 composer require route-forge/thinkphp
-cp vendor/route-forge/thinkphp/config/forge.php config/forge.php
+php think route:forge:publish   # copies package config/forge.php → app config/forge.php (skips if exists; --force overwrites with backup)
 ```
 
-The `ForgeService` is auto-discovered via composer `extra.think.services`. If auto-discovery is off, add `\RouteForge\ThinkPHP\ForgeService::class` to `app/service.php`.
+Manual copy equivalent (no ThinkPHP `vendor:publish`): `cp vendor/route-forge/thinkphp/config/forge.php config/forge.php`.
+
+The `ForgeService` is auto-discovered via composer `extra.think.services`. If auto-discovery is off, add `\RouteForge\ThinkPHP\ForgeService::class` to `app/service.php`. The other `route:forge:*` commands emit a warning (and, on an interactive TTY, offer to copy) when `config/forge.php` is missing.
 
 ## Core API
 
@@ -66,6 +68,7 @@ GET /_forge/routes           # summary: all tiers + global config, for client au
 php think route:forge:list [--level=manage] [--json] [--unassigned] [--aliases]
 php think route:forge:types [--level=admin] [--json] [--out=../frontend/src/types/forge-routes.d.ts]
 php think route:forge:clear [--level=manage]
+php think route:forge:publish [--force]   # copies default config into app config/forge.php
 ```
 
 ### Inline summary (server-rendered HTML fast path)
@@ -80,6 +83,7 @@ Global helper, usable in any template: `{:forge_summary()}` in `<head>` before t
 - Resource routes (`Route::resource`) generate unnamed rules → they do not appear in metadata; write individual named routes when you need metadata.
 - Repeated `->forgeAlias()` calls **overwrite** (not merge): declare all aliases in one call.
 - No `/_forge/manager` visual panel in v1 (planned). No `route:clear` cascade linkage (ThinkPHP has no such command).
+- No ThinkPHP `vendor:publish`: `php think route:forge:publish` copies the default config; the other commands warn (and interactively offer to copy) when `config/forge.php` is missing.
 - Command warnings go straight to `STDERR` (ThinkPHP console has no separate stderr output stream); stdout stays clean for `--json` / `--out` product piping.
 
 ## Conventions for agents working in this repo

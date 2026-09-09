@@ -32,12 +32,6 @@ Route Forge 让后端路由表成为**单一事实来源（single source of trut
 composer require route-forge/thinkphp
 ```
 
-然后把配置文件复制到应用配置目录（ThinkPHP 无 vendor:publish）：
-
-```bash
-cp vendor/route-forge/thinkphp/config/forge.php config/forge.php
-```
-
 服务经 composer `extra.think.services` 自动发现（think-installer 生成 `vendor/services.php`）。若你的项目未启用自动发现，在 `app/service.php` 手动追加：
 
 ```php
@@ -46,6 +40,20 @@ return [
     \RouteForge\ThinkPHP\ForgeService::class,
 ];
 ```
+
+然后用命令把默认配置发布到应用配置目录（ThinkPHP 无 vendor:publish）：
+
+```bash
+php think route:forge:publish
+```
+
+该命令把包内 `config/forge.php` 复制为应用 `config/forge.php`；目标已存在时默认跳过、不覆盖你的改动（加 `--force` 覆盖，会先备份原文件）。若不便运行命令，手动复制等价：
+
+```bash
+cp vendor/route-forge/thinkphp/config/forge.php config/forge.php
+```
+
+未复制配置就运行 `route:forge:list` 等命令时，会给出 warning 并（交互终端下）询问是否立即复制，避免「忘了复制导致端点无数据」。
 
 ## 快速上手
 
@@ -112,6 +120,9 @@ php think route:forge:types
 
 # 清除路由元信息缓存（--level=manage 清除单层级并同步失效摘要）
 php think route:forge:clear
+
+# 发布默认配置到应用 config/forge.php（目标已存在默认跳过；--force 覆盖并自动备份）
+php think route:forge:publish
 ```
 
 ### 路由别名（改名迁移 / 长期稳定对外名）
@@ -170,6 +181,7 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 | 资源路由 `->tier()` | 生效（写入每条资源路由 action） | 机制上生效，但资源路由无显式命名 → 不进元信息；需要元信息请手写逐条路由 |
 | `url_lazy_route` | —（无此机制） | **不支持**：开启后端点扫描/命令 fail-fast 抛异常（延迟解析下规则树不完整） |
 | `route:forge:clear` 联动 | 监听 `route:clear` 自动连带清除 | think 无 `route:clear` 命令，无联动 |
+| 配置发布 | `vendor:publish`（Laravel 原生） | `php think route:forge:publish` 命令复制默认配置；未复制时运行其他命令会 warning + 交互式提示复制 |
 | 管理器页面 | `GET /_forge/manager` 可视化面板 | **v1 不含**（规划二期） |
 | 命令警告输出 | stderr（`--out` 时 stdout 产物纯净） | think console 无独立 stderr 流，直写 `STDERR`，stdout 产物同样纯净 |
 | `@forgeSummary` 指令 | Blade 指令 | 全局 helper `forge_summary()`（模板 `{:forge_summary()}`） |

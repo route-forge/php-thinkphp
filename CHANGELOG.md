@@ -5,6 +5,17 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### Added
+
+- **`route:forge:publish` 命令**：ThinkPHP 无 `vendor:publish`，此命令把包内默认 `config/forge.php` 复制到应用 `config/forge.php`，替代「开发者手动复制」。目标已存在时默认跳过不覆盖；`--force` 覆盖前自动备份为 `forge.php.bak-{Ymd-His}`。
+- **缺配置守卫**：`route:forge:list` / `types` / `clear` 启动时检测 `config/forge.php` 是否已发布；未发布则提示——人类可读输出（list 表格 / clear）在交互终端 `confirm` 询问是否立即复制，数据产物形态（`list --json` / `types` 的 d.ts/JSON）仅写 STDERR，绝不污染 `--json` / 重定向的 stdout 管道。CI / 非交互环境 `confirm` 返回默认值，不挂起、不读 STDIN。
+
+### Changed
+
+- 文档「完整文档」入口由指向 `php-laravel/.docs` 统一改指 route-forge 文档站 <https://route-forge.github.io/docs/>（`config/forge.php` 头、README、llms.txt）；修正 README 中 `route-forge/common` 误链到 php-laravel 仓的问题。
+
 ## [0.0.1] - 2026-09-09
 
 ### Added

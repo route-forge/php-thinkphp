@@ -1,9 +1,10 @@
 <?php
 // +----------------------------------------------------------------------
-// | Route Forge 配置（拷贝到应用 config/ 目录：config/forge.php）
+// | Route Forge 配置
 // +----------------------------------------------------------------------
-// | ThinkPHP 无 vendor:publish，包安装后请将本文件复制到应用 config/forge.php
-// | 并按项目实际层级划分调整。字段语义与 route-forge/laravel 版一致，
+// | ThinkPHP 无 vendor:publish。安装后运行 `php think route:forge:publish`
+// | 即可把本文件复制到应用 config/forge.php（默认不覆盖已有文件；--force 覆盖并自动备份），
+// | 再按项目实际层级划分调整。字段语义与 route-forge/laravel 版一致，
 // | 完整文档见 route-forge 文档站 https://route-forge.github.io/docs/
 // +----------------------------------------------------------------------
 
