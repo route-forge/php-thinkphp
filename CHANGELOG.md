@@ -14,8 +14,14 @@
   - **只新增、绝不删除**：不动已写规则；删除是开发者的手；幂等可反复运行（已存在于实时路由表或生成文件里的名字跳过）。
   - **悬空只提醒**：生成文件里指向已消失控制器/方法的条目仅报告，不清理。
   - **不写 tier**：生成条目落 `unassigned`，留 `// ->tier('…') 待填` 注释。
-  - **防误用**：自动判定单/多应用——单应用禁 `--module`、多应用必须显式 `--module`（或 `*`），杜绝「悄悄扫全部」；提供 `--path` / `--namespace` 限定范围、`--dry-run` 预览。
-  - v1 边界：只自动生成常规单应用 `app/controller` 下「方法名即动作」的端点；invokable / 带路径参数 / 非常规 `url_convert`·`action_suffix` 交由人写并登记提示。
+  - **防误用**：自动判定单/多应用——单应用禁 `--module`、多应用必须显式 `--module`（或 `*`），杜绝「悄悄扫全部」；`app/controller` 与模块控制器目录并存的混合布局判为有歧义、直接停下要求 `--mode=single|multi`，不替你猜；提供 `--path` / `--namespace` 限定范围、`--dry-run` 预览。
+  - **落盘可见**：目标不可写/被目录占位时显式报错并说明本轮已写入哪些文件，不会静默留下半个文件却返回成功；本命令幂等，修好后重跑同一命令即补齐。
+  - 动作段按 ThinkPHP 自身的可达规则反推：think 用「URL 段 + `route.action_suffix`」命中方法，故可达 URL 是方法名剔掉后缀的短形式（`listView` 在 `action_suffix='View'` 下可达于 `user/list`）；方法名不以该后缀结尾的本就无可达 URL，只登记提示、不生成（生成即凭空新增端点）。invokable / 带路径参数仍交人写。camelCase 动作段照常生成，但给一条大小写风险提示（`url_case_sensitive=true` 时历史小写写法会 404）。
+
+### Fixed
+
+- **命令失败不再向用户倒框架堆栈**：`route:forge:list` / `types` 此前只捕获 `ForgeExceptionContract`，适配层自己的 fail-fast（`url_lazy_route=true`、非 `RuleItem` 规则）直接逃到 console 异常处理器。现在统一只输出可操作消息；且数据产物形态（`list --json` / `types` 的 d.ts/JSON）的失败信息改走 STDERR——此前连 `[RF_BE_008]` 错误文本都会混进产物。
+- **`route:forge:types --out` 的写盘校验在生产运行时永不生效**：ThinkPHP 的错误初始化器把 `file_put_contents` 的 `E_WARNING` 抛成 `ErrorException`，`=== false` 分支轮不到执行（仅在测试里可达）。现以 `@` 抑制后正确判定并报错。
 
 ## [0.0.2] - 2026-09-09
 
