@@ -28,9 +28,9 @@ final class Http
     /**
      * @return array<string,mixed>
      */
-    public static function getJson(App $app, string $path): array
+    public static function getJson(App $app, string $path, array $server = []): array
     {
-        $response = self::get($app, $path);
+        $response = self::get($app, $path, $server);
         $decoded = json_decode($response->getContent(), true);
 
         if (!is_array($decoded)) {

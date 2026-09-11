@@ -67,6 +67,12 @@ return [
     // 显式 ->tier()（含 group 透传）与配置 match 之间
     'classifier' => null,
 
+    // 管理器页面（/_forge/manager）允许访问的来源 IP。管理器路由仅在 app_debug=true 时
+    // 注册，本项是第二层防护：键缺失按 ['127.0.0.1', '::1'] 处理（仅本机；localhost
+    // 可能解析为 IPv6 的 ::1，故一并放行）；列表含 '*' 放行任意来源；null 或空数组 =
+    // 不做 IP 限制（局域网暴露需自担风险）。单个字符串等价于只含它的数组。
+    'manager_allowed_ips' => ['127.0.0.1', '::1'],
+
     // 路由别名映射表：键=别名（旧路由名），值=真实路由名。
     // 与路由链式 ->forgeAlias('旧名') 并用时宏优先；悬空别名抛 AliasTargetException。
     'aliases' => [],

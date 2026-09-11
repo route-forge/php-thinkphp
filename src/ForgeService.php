@@ -23,6 +23,8 @@ use RouteForge\ThinkPHP\Console\RouteForgeGenCommand;
 use RouteForge\ThinkPHP\Console\RouteForgeListCommand;
 use RouteForge\ThinkPHP\Console\RouteForgePublishCommand;
 use RouteForge\ThinkPHP\Console\RouteForgeTypesCommand;
+use RouteForge\ThinkPHP\Http\ForgeManagerController;
+use RouteForge\ThinkPHP\Http\Middleware\ManagerAllowedIps;
 use RouteForge\ThinkPHP\Support\AutoRouteScanner;
 use RouteForge\ThinkPHP\Support\ConfigPublisher;
 use RouteForge\ThinkPHP\Support\ThinkRouteCollection;
@@ -42,7 +44,9 @@ use think\Service;
  *   - 注册元信息端点 GET /{endpoint_prefix}/{level} 与摘要端点 GET /{endpoint_prefix}；
  *   - 注册 route:forge:list / types / clear / publish / gen 五个 think console 命令；
  *     （gen：从自动路由增量物化显式命名路由，辅助习惯自动路由的项目快速接入）
- *   - 内嵌摘要经全局 helper forge_summary()（模板中 {:forge_summary()} 使用）。
+ *   - 内嵌摘要经全局 helper forge_summary()（模板中 {:forge_summary()} 使用）；
+ *   - 注册管理器 /_forge/manager（仅 app_debug=true）：路由总览、配置查看与编辑落盘，
+ *     外加来源 IP 白名单守卫。
  *
  * 零侵入说明：ThinkPHP 无宏机制，->tier() / ->forgeAlias() 走 Rule::__call
  * 落 option，本服务不做任何 Router 重绑与继承链替换。
@@ -54,6 +58,11 @@ class ForgeService extends Service
      */
     private const FRAMEWORK_EXCLUDED_PREFIXES = ['__think_auto_route__'];
 
+    /**
+     * 管理器入口前缀：固定值，不随 endpoint_prefix 变化（与 laravel 版一致）。
+     */
+    private const MANAGER_PREFIX = '/_forge/manager';
+
     public function register(): void
     {
         // register() 在 RegisterService initializer 中执行，config 已于 App::load() 加载
@@ -63,6 +72,7 @@ class ForgeService extends Service
     public function boot(): void
     {
         $this->registerMetadataEndpoints();
+        $this->registerManagerRoutes();
         $this->commands([
             RouteForgeListCommand::class,
             RouteForgeTypesCommand::class,
@@ -234,6 +244,39 @@ class ForgeService extends Service
 
         if (count($summaryMiddleware) > 0) {
             $summaryRoute->middleware($summaryMiddleware);
+        }
+    }
+
+    /**
+     * 注册管理器路由（两层访问控制）。
+     *
+     * 第一层：非 debug 环境不注册任何管理器路由——生产环境连「403 探测面」都不给。
+     * 判定必须走 isDebug()：think 只认 APP_DEBUG=0/1，`.env` 里 `app_debug=false`
+     * 字符串对 think 的 env 解析是真值，读原始 env 会把生产当开发。
+     * 第二层：ManagerAllowedIps 按 forge.manager_allowed_ips 限制来源 IP。
+     *
+     * 注册时机与元信息端点相同（boot 先于 route/*.php 加载），URI 唯一且
+     * completeMatch，不与业务路由互相遮蔽。路由名统一带 forge.manager. 前缀，
+     * common 的 RouteNameFilter::FORGE_PREFIXES 已含该前缀，故管理器自身不会出现在
+     * 元信息端点与命令输出中，strict_mode 也不会因包自身路由未命中层级而必然抛错。
+     */
+    protected function registerManagerRoutes(): void
+    {
+        if (!$this->app->isDebug()) {
+            return;
+        }
+
+        $router = $this->app->route;
+
+        $routes = [
+            $router->get(self::MANAGER_PREFIX . '/api/routes', [ForgeManagerController::class, 'routes'])
+                ->name('forge.manager.api.routes'),
+            $router->get(self::MANAGER_PREFIX . '/api/config', [ForgeManagerController::class, 'config'])
+                ->name('forge.manager.api.config'),
+        ];
+
+        foreach ($routes as $route) {
+            $route->completeMatch()->middleware([ManagerAllowedIps::class]);
         }
     }
 
