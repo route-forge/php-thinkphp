@@ -62,6 +62,19 @@ GET /_forge/routes/{level}   # per-tier metadata (name + URI + methods + params)
 GET /_forge/routes           # summary: all tiers + global config, for client auto-discovery
 ```
 
+### Manager (dev-only UI)
+
+```text
+GET  /_forge/manager                # page: self-contained single-file HTML (inline CSS/JS, zero CDN / build / npm deps)
+GET  /_forge/manager/api/routes     # all named routes + tier assignment (alias rows carry alias_of)
+GET  /_forge/manager/api/config     # current levels + global settings
+PUT  /_forge/manager/api/config     # regenerate config/forge.php
+```
+
+Two stacked guards, both required. The routes are not registered at all unless `app_debug` is on — checked via `App::isDebug()`, because think only honours `APP_DEBUG=0/1` (the string `app_debug=false` in `.env` is truthy to think's env parser, so reading raw env would treat production as development). On top of that, `manager_allowed_ips` whitelists source IPs: default `['127.0.0.1', '::1']` (loopback only; `::1` because localhost may resolve to IPv6), `'*'` allows any source, `null` or `[]` disables the check, and a scalar string is equivalent to a single-element array. Key absent → safe default (loopback only), so projects that published config before this key existed stay closed.
+
+Saving is stricter than the Laravel adapter: the existing `config/forge.php` is backed up as `.bak-{Ymd-His}` first, then both `runtime/config.php` (think's compiled config cache, which otherwise silently overrides it) and the route metadata cache are invalidated so the edit takes effect on the next request. Generated values are plain literals (no `Env::get` wrapper) — an edit in the UI must not be shadowed by a stale `.env`; a configured `classifier` closure makes the save refuse with 422 instead of being silently flattened to null; and write failures are logged server-side rather than echoed (messages contain absolute paths).
+
 ### Commands (think console)
 
 ```bash
@@ -83,7 +96,7 @@ Global helper, usable in any template: `{:forge_summary()}` in `<head>` before t
 - `url_lazy_route=true` is **not supported** (scanning would be incomplete) → endpoints/commands fail fast with a clear message.
 - Resource routes (`Route::resource`) generate unnamed rules → they do not appear in metadata; write individual named routes when you need metadata.
 - Repeated `->forgeAlias()` calls **overwrite** (not merge): declare all aliases in one call.
-- No `/_forge/manager` visual panel in v1 (planned). No `route:clear` cascade linkage (ThinkPHP has no such command).
+- Manager page is rendered **without a view engine**: `think\View` is only a Manager shell whose drivers live under `\think\view\driver\` (requires installing `topthink/think-view`), so `ManagerPageRenderer` reads the bundled self-contained template and returns HTML directly — no extra dependency forced on consumers. No `route:clear` cascade linkage (ThinkPHP has no such command).
 - No ThinkPHP `vendor:publish`: `php think route:forge:publish` copies the default config; the other commands warn (and interactively offer to copy) when `config/forge.php` is missing.
 - `route:forge:gen` (ThinkPHP-only, adoption aid): materializes auto-routed endpoints (`/{controller}/{action}`, no rule written) into explicit named routes in a generated file (single-app `route/forge.auto.php`; multi-app `app/{module}/route/forge.auto.php`). Additive only — never deletes or rewrites existing rules; dangling entries (controller/method gone) are only reported; generated routes carry no tier (land in `unassigned` with a `->tier` TODO). Action segment follows ThinkPHP's own reachability rule (`URL segment + route.action_suffix` must hit the method), so a reachable URL is the method name with the suffix stripped; methods not ending in that suffix have no reachable URL and are reported without being generated. Auto-detects single/multi app, rejects `--module` in single mode, requires explicit `--module` in multi mode, and stops with `ambiguous` when `app/controller` coexists with module controller dirs (pass `--mode=single|multi`). camelCase actions are generated verbatim with a case-sensitivity caveat (`url_case_sensitive=true` would break legacy lowercase URLs); invokable controllers and path-param endpoints are left to hand-authoring.
 - Command warnings **and failure messages** go straight to `STDERR` (ThinkPHP console has no separate stderr output stream); stdout stays clean for `--json` / `--out` product piping.

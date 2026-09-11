@@ -7,6 +7,16 @@
 
 ## [未发布]
 
+### Added
+
+- **管理器 `/_forge/manager`（仅 `app_debug=true`）**：参考 laravel 版实现的可视化面板——层级总览、路由搜索与详情、levels 与全局设置的编辑落盘。
+  - **两层访问控制**：非 debug 环境根本不注册管理器路由（判定走 `App::isDebug()`——think 只认 `APP_DEBUG=0/1`，读原始 env 会把生产当开发），再叠加 `manager_allowed_ips` 来源 IP 白名单。白名单读取处 `(array)` 归一，并区分「键缺失」（默认仅回环）与「显式 null」（不限制）——think 的 `Config::get` 点号路径按 `isset()` 判定，显式 null 会被误读成缺失。
+  - **只读 API**：`GET api/routes`（含别名条目、剔 HEAD）、`GET api/config`（展示值与守卫生效值同源）。路由名统一带 `forge.manager.` 前缀，由 common 的排除规则兜住，不进任何元信息输出。
+  - **页面零依赖**：包内自包含模板 + `ManagerPageRenderer` 直出，不依赖 `topthink/think-view`（`think\View` 只是 Manager 壳）。注入数据带 `JSON_HEX_TAG`，层级 description 里的 `</script>` 无法截断脚本块；占位符未替换完即抛错，不交付半个页面。
+  - **写盘比 laravel 版更严三处**：复用 common 生成器后由 `ThinkConfigFileStyler` 只重排外壳为 think 风格，写前做**值不变性校验**（分别回读适配前后产物，严格相等才落盘）；覆盖前按本包纪律备份 `.bak-{Ymd-His}`；成功后清 `runtime/config.php` 与路由元信息缓存两级，改完下一个请求即生效。`classifier` 是闭包无法序列化，配置了它时拒存 422 而非静默抹平。
+  - 生成物的值是**字面量**，不再包 `Env::get`：页面上改了就该立即生效，包回去会被 `.env` 旧值遮蔽成「改了没生效」；该取舍写进生成文件头部注释，需要 `.env` 驱动的手工改回。
+  - 新增配置项 `manager_allowed_ips`（默认 `['127.0.0.1', '::1']`）。此前已发布过配置的项目没有该键，落到仅本机默认，不会因升级而放开访问。
+
 ### Fixed
 
 - **层级 `endpoint_middleware` 传单值字符串时被静默忽略（端点裸奔）**：`ForgeService` 注册层级元信息端点时用裸值 `is_array()` 守卫，配置写 `'endpoint_middleware' => 'auth'`（与 think 的 `->middleware()` 同形的合法写法）会判 `false` 直接跳过注册——不报错、不崩溃，该层级元信息端点连中间件都没挂，开发者却以为它受保护，属危险方向的静默失效。现与摘要端点侧、laravel 版同口径在入口 `(array)` 归一（`null` → `[]`，保持「不限制」语义）。该配置项不经 `route-forge/common` 任何读取路径（common 1.1.1 的归一化只覆盖 `match.prefix` / `match.middleware` / `middleware_match`），故归一只能落在适配层。

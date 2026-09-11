@@ -185,6 +185,33 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 
 输出一段 `<script>`，以一次性、消费即自删、不可枚举的 `window.__ROUTE_FORGE__` 访问器暴露摘要，`@route-forge/core` 读取后跳过首屏的摘要 HTTP 往返。XSS 安全编码，`</script>` 无法截断脚本块。
 
+### 管理器（仅开发环境）
+
+浏览器访问 `/_forge/manager`：看层级分布、按名称/URI/中间件搜路由、看单条路由详情、编辑层级与全局配置。形态与 Laravel 版一致——包内**单文件自包含** HTML（内联 CSS/JS，零 CDN、零构建产物、零 npm 依赖），取数走同前缀下的相对路径，部署在子目录也不受影响。
+
+```text
+GET  /_forge/manager                # 页面
+GET  /_forge/manager/api/routes     # 全部命名路由 + 层级归属（别名条目带 alias_of）
+GET  /_forge/manager/api/config     # 当前 levels 与全局设置
+PUT  /_forge/manager/api/config     # 重新生成 config/forge.php
+```
+
+两层访问控制叠加，缺一不可：
+
+1. **非 `app_debug` 环境根本不注册这些路由**，生产连探测面都不存在。判定走 `App::isDebug()`：ThinkPHP 只认 `APP_DEBUG=0/1`，`.env` 里 `app_debug=false` 字符串对 think 的 env 解析是真值，直接读原始 env 会把生产当开发。
+2. **来源 IP 白名单** `manager_allowed_ips`：默认 `['127.0.0.1', '::1']`（仅本机；`::1` 是防浏览器把 localhost 解析成 IPv6 回环）；列表含 `'*'` 放行任意来源；`null` 或空数组表示不做 IP 限制（局域网暴露自担风险）；数组或单个字符串都接受。
+
+ThinkPHP 侧的落地差异：
+
+- 页面不依赖视图引擎：`think\View` 只是 Manager 壳，模板驱动位于 `\think\view\driver\`（要另装 `topthink/think-view` 才有实现），为管理器强加这个依赖不划算，故由 `ManagerPageRenderer` 读包内模板直出 HTML；注入数据带 `JSON_HEX_TAG` 转义，层级 description 里的 `</script>` 无法截断脚本块。
+- 保存前先备份为 `config/forge.php.bak-{Ymd-His}`，与 `route:forge:publish --force` 同一套纪律。
+- 保存后清两级缓存：删 `runtime/config.php`（think 的编译配置缓存，命中即整体覆盖配置），并整体失效路由元信息缓存，改完下一个请求即生效。
+- 生成的 `config/forge.php` 里值是**字面量**，不再经 `Env::get` 读 `.env`——在页面上改了就该立即生效，否则会被 `.env` 旧值遮蔽成「改了没生效」；需要 `.env` 驱动的手工改回，生成文件头部也写明了这点。
+- `classifier` 是闭包、无法序列化进配置文件：配置了它时保存直接拒（422），而不是静默抹平用户的分类逻辑。
+- 写盘失败只在响应里给通用提示、细节进应用日志（异常消息含服务器绝对路径，而白名单可以被显式配成 `'*'`）。
+
+`route:forge:publish` 之前发布过配置的老项目，其 `config/forge.php` 里没有 `manager_allowed_ips` 键，会落到安全默认（仅本机可访问）。
+
 ### IDE 智能提示
 
 `->tier()` / `->forgeAlias()` 经 ThinkPHP 的 `__call` 魔术方法落到路由 option，类里没有真实声明，IDE 默认不会对它们补全。包根附带一份 **dev-only** 提示桩 `_ide_helper.php`（对 `think\route\Rule` 贴 `@method`）：
@@ -212,6 +239,7 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 | `scheme_version`     | `int`          | `1`                | 摘要端点 `schemeVersion`（格式版本，破坏性变更时递增）               |
 | `classifier`         | `callable\|null` | `null`           | 自定义分类回调 `fn(\think\route\RuleItem $r): ?string`               |
 | `aliases`            | `array`        | `[]`               | 别名映射表（键=别名，值=真实路由名）                                 |
+| `manager_allowed_ips`| `string\|string[]` | `['127.0.0.1', '::1']` | 管理器来源 IP 白名单（仅 `app_debug=true` 时生效）；`'*'` 放行任意，`null` / 空数组不限制 |
 
 开发模式（`app_debug=true`，即 `.env` 的 `APP_DEBUG=1`）下自动跳过所有缓存读写，路由变更即时生效。
 
@@ -227,7 +255,7 @@ ThinkPHP 模板无 Blade 指令机制，等价物是全局 helper（包安装后
 | `url_lazy_route` | —（无此机制） | **不支持**：开启后端点扫描/命令 fail-fast 抛异常（延迟解析下规则树不完整） |
 | `route:forge:clear` 联动 | 监听 `route:clear` 自动连带清除 | think 无 `route:clear` 命令，无联动 |
 | 配置发布 | `vendor:publish`（Laravel 原生） | `php think route:forge:publish` 命令复制默认配置；未复制时运行其他命令会 warning + 交互式提示复制 |
-| 管理器页面 | `GET /_forge/manager` 可视化面板 | **v1 不含**（规划二期） |
+| 管理器页面 | Blade 模板 `view('forge::manager')`；保存裸写 `config/forge.php`，随后删 `bootstrap/cache/config.php` | 包内自包含 HTML 直出（不依赖 `topthink/think-view`）；保存前自动备份，写后清 `runtime/config.php` + 路由元信息缓存 |
 | 命令警告输出 | stderr（`--out` 时 stdout 产物纯净） | think console 无独立 stderr 流，直写 `STDERR`，stdout 产物同样纯净 |
 | `@forgeSummary` 指令 | Blade 指令 | 全局 helper `forge_summary()`（模板 `{:forge_summary()}`） |
 | 连续多次 `->forgeAlias()` | 合并（宏内部 merge） | **覆盖**（`setOption` 语义）：所有别名须在一次调用中声明 |
