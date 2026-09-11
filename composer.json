@@ -1,6 +1,6 @@
 {
     "name": "route-forge/thinkphp",
-    "description": "ThinkPHP named routes for SPA frontends: per-tier lazy loading via an HTTP metadata endpoint, an auto-discovery summary, TypeScript type generation, and zero-annotation route export. ThinkPHP adapter of the route-forge project.",
+    "description": "ThinkPHP 命名路由的 SPA 后端：按层级（tier）懒加载的 HTTP 元信息端点、自动发现摘要、TypeScript 类型生成、零注解路由导出。route-forge 项目的 ThinkPHP 适配包。",
     "license": "MIT",
     "type": "library",
     "homepage": "https://github.com/route-forge/php-thinkphp",
