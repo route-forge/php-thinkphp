@@ -64,6 +64,7 @@ php think route:forge:gen              # 单应用：增量生成到 route/forge
 php think route:forge:gen --dry-run    # 先看会新增/提醒什么，不落盘
 php think route:forge:gen --module=admin,api   # 多应用：只生成指定模块到 app/{模块}/route/forge.auto.php
 php think route:forge:gen --module=*           # 多应用：显式扫全部模块
+php think route:forge:gen --mode=single        # 布局有歧义时（app/controller 与模块目录并存）显式表态
 ```
 
 语义刻意保守：
@@ -74,7 +75,7 @@ php think route:forge:gen --module=*           # 多应用：显式扫全部模�
 - **不写 tier**——生成条目先落 `unassigned`，留 `// ->tier('…') 待填` 注释，你按需分层。
 - **防误用**——自动判定单/多应用：单应用禁 `--module`；多应用必须显式给 `--module`（或 `*`），不会「悄悄扫全部」。若 `app/controller` 与模块级控制器目录**并存**（从单应用迁多应用的常见残留），判定为有歧义、直接停下，要求你用 `--mode=single|multi` 表态，不替你猜。
 
-边界（v1 如实说明）：自动生成**常规单应用 `app/controller` 下、方法名即动作**的端点；invokable 控制器、带路径参数、非常规 `url_convert`/`action_suffix` 的项目，命令只登记提示，交由你手写校验。切 `url_route_must=true`（强制路由）前，先 `route:forge:list` 核对覆盖，避免漏生成导致 404。
+边界（v1 如实说明）：命令按 think 自己的可达规则反推 URL——控制器段 `snake`、动作段是「方法名剔掉 `route.action_suffix`」的短形式（think 用「URL 段 + suffix」命中方法，故 `listView` 在 `action_suffix='View'` 下可达于 `user/list`）。方法名不以该后缀结尾的**本来就没有可达 URL**，命令只登记不生成（生成等于凭空新增端点）。invokable 控制器、带路径参数的端点同样只登记提示，交你手写。camelCase 方法（如 `batchImport`）会照常生成，但会给一条大小写风险提示：默认 `url_case_sensitive=false` 时新旧写法都能命中，若你设成 `true`，历史自动路由靠大小写不敏感命中的小写写法物化后会 404。切 `url_route_must=true`（强制路由）前，先 `route:forge:list` 核对覆盖，避免漏生成导致 404。
 
 ## 快速上手
 
