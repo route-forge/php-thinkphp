@@ -79,6 +79,25 @@ class CommandTest extends TestCase
         self::assertNull($rows['auth.login']['alias_of']);
     }
 
+    /**
+     * 铁律：debug 下注册的管理器路由（`forge.manager.*`）与元信息端点路由
+     * （`forge.routes.*`）都不许出现在 list 的任何一种输出形态里——它们不带 tier，
+     * 一旦泄漏，strict_mode 下命令会因包自身路由未命中层级直接失败。
+     * 现有用例只靠 count 隐式兜住，这里把性质写成直白断言。
+     */
+    public function testForgeOwnRoutesNeverAppearInListOutput(): void
+    {
+        [$exit, $json] = $this->runCommand($this->makeApp(), 'route:forge:list', ['--json']);
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('forge.manager', $json);
+        self::assertStringNotContainsString('forge.routes', $json);
+
+        [$exit, $table] = $this->runCommand($this->makeApp(), 'route:forge:list');
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('forge.manager', $table);
+        self::assertStringNotContainsString('forge.routes', $table);
+    }
+
     public function testListLevelFilterAndUnknownLevel(): void
     {
         $app = $this->makeApp();
