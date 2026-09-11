@@ -11,9 +11,9 @@ Route Forge 通过一个轻量的 HTTP 元信息端点把 ThinkPHP 的命名路�
 [![Tests](https://img.shields.io/github/actions/workflow/status/route-forge/php-thinkphp/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/route-forge/php-thinkphp/actions)
 [![License](https://img.shields.io/github/license/route-forge/php-thinkphp.svg?style=flat-square)](./LICENSE)
 
-> 文档语言：简体中文（v1 暂不提供英文版）。机器可读概览见 [`llms.txt`](./llms.txt)。
+> 文档语言：简体中文（ThinkPHP 的使用者基本在国内，本包不做英文版）。机器可读概览见 [`llms.txt`](./llms.txt)。
 
-**语言 / Language:** 简体中文 · English *(planned)*
+**语言 / Language:** 简体中文
 
 > **面向 AI 助手 / 编码 Agent：** 本包为 [`route-forge/thinkphp`](https://packagist.org/packages/route-forge/thinkphp)。完整功能规格（框架无关部分）见 [route-forge 文档站](https://route-forge.github.io/docs/)，ThinkPHP 差异见下方[「与 Laravel 版的差异」](#与-laravel-版的差异)。
 
