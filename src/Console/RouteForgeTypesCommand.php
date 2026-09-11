@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace RouteForge\ThinkPHP\Console;
 
+use InvalidArgumentException;
 use RouteForge\Common\Analyzer\RouteAnalyzer;
 use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\Common\Repository\RouteRepository;
 use RouteForge\Common\Type\TypeGenerator;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
+use RouteForge\ThinkPHP\Console\Concerns\ReportsCommandFailure;
 use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
+use RuntimeException;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
@@ -19,11 +22,12 @@ use think\console\Output;
  * 从路由表生成 TS 类型声明。
  *
  * 对齐 Laravel 版 route:forge:types（SPEC §3.2）：--level / --json / --out。
- * think 差异：console 无独立 stderr，警告在产物前同流输出（--out 时文件
- * 内容仍纯净，警告仅出现在控制台）。
+ * think 差异：console 无独立 stderr 流，故警告与失败信息一律改走 STDERR 真流
+ * （types 的 stdout 恒为 d.ts/JSON 产物），--out 时文件内容同样纯净。
  */
 class RouteForgeTypesCommand extends Command
 {
+    use ReportsCommandFailure;
     use WarnsMissingConfig;
 
     protected function configure(): void
@@ -53,10 +57,11 @@ class RouteForgeTypesCommand extends Command
 
         // level 过滤校验
         if ($filterLevel !== null && $filterLevel !== '' && !in_array($filterLevel, $levels, true)) {
-            $output->writeln("<error>Unknown level: {$filterLevel}</error>");
-            $output->writeln('Available levels: ' . (empty($levels) ? '(none)' : implode(', ', $levels)));
-
-            return 1;
+            return $this->fail(
+                $output,
+                "Unknown level: {$filterLevel}\nAvailable levels: " . (empty($levels) ? '(none)' : implode(', ', $levels)),
+                true,
+            );
         }
 
         try {
@@ -65,9 +70,11 @@ class RouteForgeTypesCommand extends Command
             );
             $analysis = $analyzer->analyzeRoutes($collection, $normalizer);
         } catch (ForgeExceptionContract $e) {
-            $output->writeln("<error>[{$e->code()}] {$e->getMessage()}</error>");
-
-            return 1;
+            return $this->fail($output, "[{$e->code()}] {$e->getMessage()}", true);
+        } catch (RuntimeException | InvalidArgumentException $e) {
+            // 适配层自身的 fail-fast（url_lazy_route=true / 非 RuleItem 规则）：
+            // 消息已含指路文本，只给消息不给框架堆栈
+            return $this->fail($output, $e->getMessage(), true);
         }
 
         $warnings = array_merge(

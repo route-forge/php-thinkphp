@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace RouteForge\ThinkPHP\Console;
 
+use InvalidArgumentException;
 use RouteForge\Common\Analyzer\RouteAnalyzer;
 use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
+use RouteForge\ThinkPHP\Console\Concerns\ReportsCommandFailure;
 use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
+use RuntimeException;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
@@ -21,10 +24,12 @@ use think\console\Output;
  *     撞车声明整行红色（think console <comment>/<info>/<error> 标签）；
  *   - --json 模式：结构化对象，契约结构由 common RouteAnalyzer::listPayload 保证。
  *
- * think 差异：无独立 stderr，警告与表格同流输出。
+ * think 差异：无独立 stderr 流，故警告与失败信息在 --json 时改走 STDERR 真流，
+ * 保证 stdout 的 JSON 可直接管道消费（见 ReportsCommandFailure / WarnsMissingConfig）。
  */
 class RouteForgeListCommand extends Command
 {
+    use ReportsCommandFailure;
     use WarnsMissingConfig;
 
     protected function configure(): void
@@ -59,10 +64,11 @@ class RouteForgeListCommand extends Command
 
         // level 过滤校验（unassigned 特殊层级合法）
         if ($filterLevel !== null && $filterLevel !== '' && !in_array($filterLevel, array_merge($levels, ['unassigned']), true)) {
-            $output->writeln("<error>Unknown level: {$filterLevel}</error>");
-            $output->writeln('Available levels: ' . (empty($levels) ? '(none)' : implode(', ', $levels)));
-
-            return 1;
+            return $this->fail(
+                $output,
+                "Unknown level: {$filterLevel}\nAvailable levels: " . (empty($levels) ? '(none)' : implode(', ', $levels)),
+                $asJson,
+            );
         }
 
         try {
@@ -72,9 +78,11 @@ class RouteForgeListCommand extends Command
             $analysis = $analyzer->analyzeRoutes($collection, $normalizer);
         } catch (ForgeExceptionContract $e) {
             // 悬空别名 / resolve 抛出的 Forge 系异常：输出 [错误码] 消息而非裸堆栈
-            $output->writeln("<error>[{$e->code()}] {$e->getMessage()}</error>");
-
-            return 1;
+            return $this->fail($output, "[{$e->code()}] {$e->getMessage()}", $asJson);
+        } catch (RuntimeException | InvalidArgumentException $e) {
+            // 适配层自身的 fail-fast（url_lazy_route=true / 非 RuleItem 规则）：
+            // 消息已含指路文本，同样只给消息不给框架堆栈
+            return $this->fail($output, $e->getMessage(), $asJson);
         }
 
         $warnings = array_merge(
