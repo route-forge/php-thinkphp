@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+## [1.0.0] - 2026-09-11
+
+0.0.x 是脚手架期；自本版起承诺公共 API、`/_forge/routes` 端点契约与命令输出形态稳定，破坏性变更一律走 major。
+
 ### Added
 
 - **`route:forge:gen` 命令 + `AutoRouteScanner`**：把「当前可被 ThinkPHP 自动路由触达的端点」反向物化成**显式命名路由**，让习惯自动路由的项目低成本接入 route-forge。
