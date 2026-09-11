@@ -6,6 +6,7 @@ namespace RouteForge\ThinkPHP\Http;
 
 use RouteForge\Common\Repository\RouteRepository;
 use RouteForge\ThinkPHP\Http\Middleware\ManagerAllowedIps;
+use RouteForge\ThinkPHP\Support\ManagerPageRenderer;
 use think\facade\Config;
 use think\Response;
 
@@ -22,8 +23,39 @@ use think\Response;
  */
 class ForgeManagerController
 {
-    public function __construct(private readonly RouteRepository $repository)
+    public function __construct(
+        private readonly RouteRepository $repository,
+        private readonly ManagerPageRenderer $page,
+    ) {
+    }
+
+    /**
+     * 管理器页面（HTML）。
+     *
+     * 页面由包内自包含模板直出（见 ManagerPageRenderer），不依赖 think 视图引擎；
+     * 前端取数走同前缀下的相对路径 API，故 endpoint_prefix 与部署子路径都不影响。
+     */
+    public function index(): Response
     {
+        $levelsConfig = (array) Config::get('forge.levels', []);
+
+        $tiers = [];
+        foreach ($levelsConfig as $name => $cfg) {
+            $cfg     = (array) $cfg;
+            $tiers[] = [
+                'name'        => (string) $name,
+                'description' => (string) ($cfg['description'] ?? ''),
+                'load'        => (string) ($cfg['load'] ?? 'lazy'),
+            ];
+        }
+
+        $global = $this->globalConfig();
+
+        return Response::create($this->page->render([
+            'tiers'        => $tiers,
+            'levelsConfig' => $levelsConfig,
+            'globalConfig' => $global,
+        ], (int) ($global['scheme_version'] ?? 1)), 'html');
     }
 
     /**

@@ -27,6 +27,7 @@ use RouteForge\ThinkPHP\Http\ForgeManagerController;
 use RouteForge\ThinkPHP\Http\Middleware\ManagerAllowedIps;
 use RouteForge\ThinkPHP\Support\AutoRouteScanner;
 use RouteForge\ThinkPHP\Support\ConfigPublisher;
+use RouteForge\ThinkPHP\Support\ManagerPageRenderer;
 use RouteForge\ThinkPHP\Support\ThinkRouteCollection;
 use RouteForge\ThinkPHP\Support\RouteCollector;
 use think\App;
@@ -91,6 +92,11 @@ class ForgeService extends Service
         $this->app->instance(ConfigPublisher::class, new ConfigPublisher($this->app));
         // 自动路由扫描器（route:forge:gen 使用）
         $this->app->instance(AutoRouteScanner::class, new AutoRouteScanner($this->app));
+        // 管理器页面渲染器：包内自包含模板直出，不依赖 topthink/think-view
+        $this->app->instance(
+            ManagerPageRenderer::class,
+            new ManagerPageRenderer(ManagerPageRenderer::packageTemplatePath())
+        );
         $this->app->instance(CommonRouteCache::class, $this->makeRouteCache());
         $this->app->instance(CommonTierResolver::class, $this->makeTierResolver());
         $this->app->instance(RouteAnalyzer::class, $this->makeRouteAnalyzer());
@@ -269,6 +275,8 @@ class ForgeService extends Service
         $router = $this->app->route;
 
         $routes = [
+            $router->get(self::MANAGER_PREFIX, [ForgeManagerController::class, 'index'])
+                ->name('forge.manager.index'),
             $router->get(self::MANAGER_PREFIX . '/api/routes', [ForgeManagerController::class, 'routes'])
                 ->name('forge.manager.api.routes'),
             $router->get(self::MANAGER_PREFIX . '/api/config', [ForgeManagerController::class, 'config'])
