@@ -38,7 +38,7 @@ return [
                 // 'middleware_match' => 'any',  // 'any'（默认，OR）/ 'all'（AND）/ DNF 数组
             ],
             'load'        => 'lazy',
-            // 'endpoint_middleware' => ['auth'],  // 访问该层级元信息端点所需的中间件
+            // 'endpoint_middleware' => ['auth'],  // 访问该层级元信息端点的中间件；数组或单个字符串（'auth'）都接受
         ],
     ],
 
@@ -48,7 +48,7 @@ return [
     // 应用的路由前缀，经摘要端点 config.url_prefix 下发；完整 URL 或路径前缀，null 不下发
     'url_prefix' => null,
 
-    // 摘要端点中间件；空数组不限制
+    // 摘要端点中间件；数组或单个字符串都接受，空数组 / null 不限制
     'endpoint_middleware' => [],
 
     // 统一缓存 TTL（秒）；null 不缓存，0 永久缓存，负值视为 null

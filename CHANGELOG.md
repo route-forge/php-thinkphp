@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+### Fixed
+
+- **层级 `endpoint_middleware` 传单值字符串时被静默忽略（端点裸奔）**：`ForgeService` 注册层级元信息端点时用裸值 `is_array()` 守卫，配置写 `'endpoint_middleware' => 'auth'`（与 think 的 `->middleware()` 同形的合法写法）会判 `false` 直接跳过注册——不报错、不崩溃，该层级元信息端点连中间件都没挂，开发者却以为它受保护，属危险方向的静默失效。现与摘要端点侧、laravel 版同口径在入口 `(array)` 归一（`null` → `[]`，保持「不限制」语义）。该配置项不经 `route-forge/common` 任何读取路径（common 1.1.1 的归一化只覆盖 `match.prefix` / `match.middleware` / `middleware_match`），故归一只能落在适配层。
+  - 回归测试：层级 / 摘要端点各补一条「单值字符串写法仍被拦截」用例；反向验证过还原旧写法时层级端点返回 200 且正常吐出数据。
+  - 文档：README 配置表与 `config/forge.php` 注释把 `endpoint_middleware` 写明为「数组或单个字符串都接受」。
+
 ## [1.0.0] - 2026-09-11
 
 0.0.x 是脚手架期；自本版起承诺公共 API、`/_forge/routes` 端点契约与命令输出形态稳定，破坏性变更一律走 major。

@@ -158,11 +158,49 @@ class EndpointTest extends TestCase
         self::assertStringNotContainsString('route_count', (string) $response->getContent());
     }
 
+    /**
+     * 单值字符串写法（与 think 的 ->middleware() 同形）必须与单元素数组等价：
+     * 修复前的裸值 is_array() 守卫会静默跳过注册，端点裸奔且不报错。
+     */
+    public function testLevelEndpointMiddlewareProtectionWithSingleString(): void
+    {
+        $app = AppFactory::create(debug: true, forgeOverrides: [
+            'levels' => [
+                'manage' => [
+                    'description'         => '管理接口',
+                    'match'               => [],
+                    'load'                => 'lazy',
+                    'endpoint_middleware' => DenyAllMiddleware::class,
+                ],
+            ],
+        ]);
+
+        $response = Http::get($app, '/_forge/routes/manage');
+
+        self::assertSame(401, $response->getCode(), substr((string) $response->getContent(), 0, 400));
+        self::assertStringNotContainsString('route_count', (string) $response->getContent());
+    }
+
     public function testSummaryEndpointMiddlewareProtection(): void
     {
         $app = AppFactory::create(debug: true, forgeOverrides: [
             'levels'              => self::LEVELS,
             'endpoint_middleware' => [DenyAllMiddleware::class],
+        ]);
+
+        $response = Http::get($app, '/_forge/routes');
+
+        self::assertSame(401, $response->getCode());
+    }
+
+    /**
+     * 摘要侧同样接受单值字符串：此处此前已有 (array) 归一，本用例锁定该口径不被回退。
+     */
+    public function testSummaryEndpointMiddlewareProtectionWithSingleString(): void
+    {
+        $app = AppFactory::create(debug: true, forgeOverrides: [
+            'levels'              => self::LEVELS,
+            'endpoint_middleware' => DenyAllMiddleware::class,
         ]);
 
         $response = Http::get($app, '/_forge/routes');

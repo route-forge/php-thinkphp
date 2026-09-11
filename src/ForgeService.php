@@ -206,8 +206,13 @@ class ForgeService extends Service
                 ->name('forge.routes.' . $level)
                 ->completeMatch();
 
-            $endpointMiddleware = $levels[$level]['endpoint_middleware'] ?? [];
-            if (is_array($endpointMiddleware) && count($endpointMiddleware) > 0) {
+            // endpoint_middleware 与 think 的 ->middleware() 同形：数组或单个字符串都接受。
+            // 入口必须自己 (array) 归一——该配置项不经 common 任何读取路径（common 只在
+            // ConfigFileGenerator 写文件时归一，TierResolver 只吃 match 三项）。此前的裸值
+            // is_array() 守卫遇单值写法会静默跳过：配置写了、中间件没挂，该层级元信息端点
+            // 直接裸奔，属危险方向的静默失效（与下方摘要端点侧、laravel 版同口径）。
+            $endpointMiddleware = (array) ($levels[$level]['endpoint_middleware'] ?? []);
+            if ($endpointMiddleware !== []) {
                 $route->middleware($endpointMiddleware);
             }
         }
