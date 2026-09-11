@@ -147,6 +147,21 @@ class RouteForgeGenCommandTest extends TestCase
     }
 
     /**
+     * 回归：写盘失败过去不判 file_put_contents 返回值——留下半个文件却报成功。
+     * 用「生成目标被目录占位」制造跨平台可控的写失败。
+     */
+    public function testWriteFailureIsReportedNotSilentlySucceeded(): void
+    {
+        mkdir($this->outFile());
+
+        [$exit, $out] = $this->gen($this->app());
+
+        self::assertSame(1, $exit, '写盘失败不得返回成功');
+        self::assertStringContainsString('生成目标是目录', $out);
+        self::assertStringContainsString('重跑', $out, '应告知本命令幂等、可修好后重跑补齐');
+    }
+
+    /**
      * 回归：多应用已装 + app/controller 与模块控制器目录并存的混合布局。
      * 过去 detectMode 里那个永不命中的重复条件使它静默回落 single，
      * 于是扫错根目录还无故拒绝 --module；现在必须停下来要求显式 --mode。

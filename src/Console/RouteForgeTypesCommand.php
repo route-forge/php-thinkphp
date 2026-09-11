@@ -112,7 +112,9 @@ class RouteForgeTypesCommand extends Command
                 return 1;
             }
 
-            if (file_put_contents($outFile, $outputContent) === false) {
+            // @ 抑制：think 的 Error 初始化器会把 E_WARNING 抛成 ErrorException，
+            // 不抑制则下面的 === false 分支在生产运行时永远走不到
+            if (@file_put_contents($outFile, $outputContent) === false) {
                 $output->writeln("<error>写入失败（权限/磁盘？）：{$outFile}</error>");
 
                 return 1;

@@ -322,6 +322,7 @@ class RouteForgeGenCommand extends Command
             $output->writeln('<info>无需新增：所有可自动路由端点都已显式定义。</info>');
         }
 
+        $written = [];
         foreach ($plannedByFile as $file => $eps) {
             $block = $this->renderBlock($eps);
             if ($dryRun) {
@@ -329,7 +330,20 @@ class RouteForgeGenCommand extends Command
                 $output->writeln($block);
                 continue;
             }
-            $this->appendToFile($file, $block);
+            try {
+                $this->appendToFile($file, $block);
+            } catch (\RuntimeException $e) {
+                // 多模块逐个追加：中途失败必须说清落了哪些、还剩哪些没落。
+                // 本命令幂等（实时表/生成文件里已有的名字会跳过），不假装回滚——
+                // 修好权限后重跑同一条命令即可补齐。
+                $output->writeln("<error>{$e->getMessage()}</error>");
+                $output->writeln('<comment>本次未全部写完：'
+                    . ($written === [] ? '尚无文件落盘' : '已写入 ' . implode(', ', $written))
+                    . '。修好后重跑同一命令即可补齐（幂等，已生成的条目会跳过）。</comment>');
+
+                return 1;
+            }
+            $written[] = $file;
             $output->writeln("<info>已生成 " . count($eps) . " 条 → {$file}</info>");
         }
 
@@ -373,12 +387,17 @@ class RouteForgeGenCommand extends Command
         if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
             throw new \RuntimeException('无法创建目录：' . $dir);
         }
-        if (!is_file($file)) {
-            file_put_contents($file, self::HEADER . $block);
-
-            return;
+        if (is_dir($file)) {
+            throw new \RuntimeException('生成目标是目录，无法写入：' . $file);
         }
-        // 追加到既有生成文件末尾
-        file_put_contents($file, "\n" . $block, FILE_APPEND);
+
+        $exists  = is_file($file);
+        $payload = $exists ? "\n" . $block : self::HEADER . $block;
+
+        // 必须 @ 抑制：think 的 Error 初始化器会把 E_WARNING 抛成 ErrorException，
+        // 不抑制就轮不到我们自己的可操作消息（对齐 route:forge:types 的写盘校验）
+        if (@file_put_contents($file, $payload, $exists ? FILE_APPEND : 0) === false) {
+            throw new \RuntimeException("写入失败（权限/磁盘？）：{$file}");
+        }
     }
 }
