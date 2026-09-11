@@ -6,9 +6,13 @@ namespace RouteForge\ThinkPHP\Http;
 
 use RouteForge\Common\Repository\RouteRepository;
 use RouteForge\ThinkPHP\Http\Middleware\ManagerAllowedIps;
+use RouteForge\ThinkPHP\Support\ManagerConfigStore;
 use RouteForge\ThinkPHP\Support\ManagerPageRenderer;
 use think\facade\Config;
+use think\facade\Log;
+use think\Request;
 use think\Response;
+use Throwable;
 
 /**
  * 管理器控制器：仅在开发环境（app_debug=true）下注册与可用。
@@ -79,6 +83,51 @@ class ForgeManagerController
         return json([
             'levels' => (array) Config::get('forge.levels', []),
             'global' => $this->globalConfig(),
+        ]);
+    }
+
+    /**
+     * API：更新配置文件（levels + 全局设置）。
+     *
+     * 校验口径与 laravel 版一致：两半都必须是数组；配置了 classifier 时直接拒存——
+     * 闭包无法序列化进配置文件，让生成器把它抹平成 null 等于静默丢掉用户的分类逻辑。
+     *
+     * 写盘细节只进日志不回显：异常消息可能带服务器绝对路径，而管理器页面的可达面
+     * 不等于可信面（manager_allowed_ips 可被显式配成 '*'）。
+     */
+    public function updateConfig(Request $request, ManagerConfigStore $store): Response
+    {
+        $levels = $request->put('levels');
+        $global = $request->put('global');
+
+        if (!is_array($levels)) {
+            return json(['error' => 'levels 必须是对象（层级名 → 层级配置）'], 422);
+        }
+
+        if (!is_array($global)) {
+            return json(['error' => 'global 必须是对象（全局设置）'], 422);
+        }
+
+        if (Config::get('forge.classifier') !== null) {
+            return json([
+                'error' => 'config/forge.php 中配置了 classifier 回调，'
+                    . '管理器无法把闭包序列化进配置文件，请手工编辑 config/forge.php。',
+            ], 422);
+        }
+
+        try {
+            $result = $store->save($levels, $global);
+        } catch (Throwable $e) {
+            Log::error('[route-forge] 管理器保存配置失败：' . $e->getMessage());
+
+            return json(['error' => '配置写入失败，详情见应用日志。'], 500);
+        }
+
+        return json([
+            'success'   => true,
+            'message'   => '配置已保存并生效',
+            // 只回「是否留了备份」，不回绝对路径
+            'backed_up' => $result['backup'] !== null,
         ]);
     }
 

@@ -27,6 +27,7 @@ use RouteForge\ThinkPHP\Http\ForgeManagerController;
 use RouteForge\ThinkPHP\Http\Middleware\ManagerAllowedIps;
 use RouteForge\ThinkPHP\Support\AutoRouteScanner;
 use RouteForge\ThinkPHP\Support\ConfigPublisher;
+use RouteForge\ThinkPHP\Support\ManagerConfigStore;
 use RouteForge\ThinkPHP\Support\ManagerPageRenderer;
 use RouteForge\ThinkPHP\Support\ThinkRouteCollection;
 use RouteForge\ThinkPHP\Support\RouteCollector;
@@ -101,6 +102,13 @@ class ForgeService extends Service
         $this->app->instance(CommonTierResolver::class, $this->makeTierResolver());
         $this->app->instance(RouteAnalyzer::class, $this->makeRouteAnalyzer());
         $this->app->instance(CommonRouteRepository::class, $this->makeRouteRepository());
+        // 管理器配置落盘编排（生成 → 外壳适配 → 回读校验 → 备份写入 → 缓存失效）。
+        // 必须在 RouteCache 绑定之后：它要拿到同一个缓存单例才能显式失效。
+        $this->app->instance(ManagerConfigStore::class, new ManagerConfigStore(
+            $this->app,
+            $this->app->make(ConfigPublisher::class),
+            $this->app->make(CommonRouteCache::class),
+        ));
     }
 
     /**
@@ -281,6 +289,8 @@ class ForgeService extends Service
                 ->name('forge.manager.api.routes'),
             $router->get(self::MANAGER_PREFIX . '/api/config', [ForgeManagerController::class, 'config'])
                 ->name('forge.manager.api.config'),
+            $router->put(self::MANAGER_PREFIX . '/api/config', [ForgeManagerController::class, 'updateConfig'])
+                ->name('forge.manager.api.config.update'),
         ];
 
         foreach ($routes as $route) {

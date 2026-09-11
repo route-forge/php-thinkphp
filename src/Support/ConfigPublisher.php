@@ -63,17 +63,7 @@ final class ConfigPublisher
             ];
         }
 
-        $backup = null;
-        if (is_file($target)) {
-            // force 覆盖前备份，保留用户既有改动可回退；同秒重复 force 时追加序号避免覆盖备份
-            $backup = $target . '.bak-' . date('Ymd-His');
-            for ($i = 2; is_file($backup); $i++) {
-                $backup = $target . '.bak-' . date('Ymd-His') . '-' . $i;
-            }
-            if (!copy($target, $backup)) {
-                throw new RuntimeException('备份现有 config/forge.php 失败：' . $target);
-            }
-        }
+        $backup = $this->backupIfPresent($target);
 
         if (!copy($source, $target)) {
             throw new RuntimeException('复制默认配置失败：' . $target);
@@ -91,5 +81,52 @@ final class ConfigPublisher
             'target'  => $target,
             'backup'  => $backup,
         ];
+    }
+
+    /**
+     * 以给定内容覆盖应用 config/forge.php（管理器「保存配置」的落盘入口）。
+     *
+     * 与 publish(force) 共用同一套备份语义：覆盖前必先备份，绝不裸写用户配置。
+     *
+     * @return string|null 备份文件路径（目标原本不存在时为 null）
+     */
+    public function save(string $content): ?string
+    {
+        $target = $this->targetPath();
+        $backup = $this->backupIfPresent($target);
+
+        // think 的错误初始化器会把 file_put_contents 的 E_WARNING 抛成 ErrorException，
+        // 故先 @ 抑制再判 false（同 route:forge:types --out 的教训）。
+        if (@file_put_contents($target, $content) === false) {
+            throw new RuntimeException('写入 config/forge.php 失败：' . $target);
+        }
+
+        if (!is_file($target) || filesize($target) === 0) {
+            throw new RuntimeException('写入后校验失败（目标为空/不存在）：' . $target);
+        }
+
+        return $backup;
+    }
+
+    /**
+     * 目标已存在则备份为 forge.php.bak-{Ymd-His}，返回备份路径；不存在返回 null。
+     * 同一秒内重复覆盖时追加序号，避免后一次备份抹掉前一次。
+     */
+    private function backupIfPresent(string $target): ?string
+    {
+        if (!is_file($target)) {
+            return null;
+        }
+
+        $backup = $target . '.bak-' . date('Ymd-His');
+        for ($i = 2; is_file($backup); $i++) {
+            $backup = $target . '.bak-' . date('Ymd-His') . '-' . $i;
+        }
+
+        if (!copy($target, $backup)) {
+            throw new RuntimeException('备份现有 config/forge.php 失败：' . $target);
+        }
+
+        return $backup;
     }
 }
