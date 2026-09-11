@@ -145,4 +145,29 @@ class RouteForgeGenCommandTest extends TestCase
         self::assertSame(1, $exit, '单应用模式用 --module 应拒绝');
         self::assertStringContainsString('单应用', $out);
     }
+
+    /**
+     * 回归：多应用已装 + app/controller 与模块控制器目录并存的混合布局。
+     * 过去 detectMode 里那个永不命中的重复条件使它静默回落 single，
+     * 于是扫错根目录还无故拒绝 --module；现在必须停下来要求显式 --mode。
+     */
+    public function testMixedLayoutRequiresExplicitMode(): void
+    {
+        mkdir($this->root . '/vendor/topthink/think-multi-app', 0777, true);
+        mkdir($this->root . '/app/shop/controller', 0777, true);
+
+        [$exit, $out] = $this->gen($this->app());
+        self::assertSame(1, $exit, '混合布局不应自行猜模式');
+        self::assertStringContainsString('无法自动判定应用模式', $out);
+        self::assertStringContainsString('--mode=multi', $out);
+        self::assertStringContainsString('shop', $out, '提示应列出可用模块');
+        self::assertFileDoesNotExist($this->outFile(), '判定失败时不得写出任何产物');
+
+        // 显式表态后继续可用：single 只扫根控制器层，不碰模块目录
+        [$exitSingle] = $this->gen($this->app(), ['--mode=single']);
+        self::assertSame(0, $exitSingle);
+        $php = (string) file_get_contents($this->outFile());
+        self::assertStringContainsString("->name('user.read')", $php);
+        self::assertStringNotContainsString("->name('shop.", $php);
+    }
 }

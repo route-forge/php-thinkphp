@@ -15,7 +15,12 @@ class AutoRouteScannerTest extends TestCase
 {
     private function scanner(): AutoRouteScanner
     {
-        $root = dirname(__DIR__) . '/Fixtures/AutoRouteApp/';
+        return $this->scannerAt('AutoRouteApp');
+    }
+
+    private function scannerAt(string $fixture): AutoRouteScanner
+    {
+        $root = dirname(__DIR__) . '/Fixtures/' . $fixture . '/';
         $app = new App($root);
         $app->initialize();
         restore_error_handler();
@@ -37,6 +42,27 @@ class AutoRouteScannerTest extends TestCase
     public function testDetectsSingleAppMode(): void
     {
         self::assertSame('single', $this->scanner()->detectMode());
+    }
+
+    public function testDetectsMultiAppModeAndListsModules(): void
+    {
+        $scanner = $this->scannerAt('MultiAppLayout');
+
+        self::assertSame('multi', $scanner->detectMode());
+        self::assertSame(['admin', 'api'], $scanner->availableModules());
+    }
+
+    /**
+     * 回归：混合布局（多应用已装，但 app/controller 与模块控制器目录并存）过去因
+     * detectMode 里的重复条件永不命中而静默回落 single，令 route:forge:gen 扫错根、
+     * 且无故拒绝 --module。现在必须报 ambiguous，由命令层要求显式 --mode。
+     */
+    public function testAmbiguousWhenRootControllerLayerCoexistsWithModules(): void
+    {
+        $scanner = $this->scannerAt('MixedAppLayout');
+
+        self::assertSame('ambiguous', $scanner->detectMode());
+        self::assertSame(['api'], $scanner->availableModules());
     }
 
     public function testGeneratesOneEndpointPerPublicOwnMethod(): void

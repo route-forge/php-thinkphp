@@ -32,9 +32,16 @@ final class AutoRouteScanner
     }
 
     /**
-     * 判定应用模式：'single' | 'multi'。
-     * 多应用需 topthink/think-multi-app（服务类存在）且 app/ 下存在含控制器层的模块目录；
-     * 否则按单应用（app/{controller_layer} 存在）。
+     * 判定应用模式：'single' | 'multi' | 'ambiguous'。
+     *
+     * 多应用需 topthink/think-multi-app（服务类存在或 vendor 目录在）：
+     *  - 装了多应用、且 app/ 下只有模块级控制器层（无 app/{controller_layer}）→ 'multi'
+     *  - 装了多应用、但 app/{controller_layer} 与模块控制器目录**并存** → 'ambiguous'：
+     *    两种解读都成立，不替用户猜（历史上从单应用迁多应用的项目常留着 app/controller），
+     *    由命令层要求显式 --mode 表态。
+     *  - 未装多应用 → 'single'
+     *
+     * @return 'single'|'multi'|'ambiguous'
      */
     public function detectMode(): string
     {
@@ -46,14 +53,11 @@ final class AutoRouteScanner
         $hasSingleDir = is_dir($appPath . DIRECTORY_SEPARATOR . $layer);
         $modules = $this->moduleDirs($appPath, $layer);
 
-        if ($multiInstalled && !$hasSingleDir && $modules !== []) {
-            return 'multi';
-        }
-        if ($multiInstalled && $modules !== [] && !$hasSingleDir) {
-            return 'multi';
+        if (!$multiInstalled || $modules === []) {
+            return 'single';
         }
 
-        return 'single';
+        return $hasSingleDir ? 'ambiguous' : 'multi';
     }
 
     /**

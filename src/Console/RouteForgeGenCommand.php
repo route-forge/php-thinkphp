@@ -59,7 +59,19 @@ class RouteForgeGenCommand extends Command
 
         // 1) 模式判定 + 防误用
         $mode = $modeOpt ?: $scanner->detectMode();
-        if (!in_array($mode, ['single', 'multi'], true)) {
+
+        if ($mode === 'ambiguous') {
+            // 混合布局：app/{控制器层} 与模块级控制器目录并存，两种解读都成立，不替用户猜
+            $available = $scanner->availableModules();
+            $output->writeln('<error>无法自动判定应用模式：app/ 根控制器层与模块级控制器目录并存。</error>');
+            $output->writeln('请显式表态：--mode=single 只生成根控制器层；'
+                . '--mode=multi --module=<模块[,模块]>（或 --module=*）按模块生成。'
+                . ($available === [] ? '' : '可用模块：' . implode(', ', $available)));
+
+            return 1;
+        }
+
+        if ($mode !== 'single' && $mode !== 'multi') {
             $output->writeln("<error>未知 --mode：{$mode}（应为 single|multi）</error>");
 
             return 1;
