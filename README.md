@@ -4,6 +4,13 @@
 
 Route Forge 通过一个轻量的 HTTP 元信息端点把 ThinkPHP 的命名路由暴露出去，支持**按层级（tier）拆分并按需懒加载**，并**生成 TypeScript 类型**，让前端的路由名与参数都具备类型安全。它零注解即可工作——直接读取 ThinkPHP 自己的路由规则树。
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/route-forge/thinkphp.svg?style=flat-square)](https://packagist.org/packages/route-forge/thinkphp)
+[![Total Downloads](https://img.shields.io/packagist/dt/route-forge/thinkphp.svg?style=flat-square)](https://packagist.org/packages/route-forge/thinkphp)
+[![PHP](https://img.shields.io/packagist/dependency-v/route-forge/thinkphp/php.svg?style=flat-square)](#环境要求)
+[![ThinkPHP](https://img.shields.io/badge/ThinkPHP-8-orange.svg?style=flat-square)](#环境要求)
+[![Tests](https://img.shields.io/github/actions/workflow/status/route-forge/php-thinkphp/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/route-forge/php-thinkphp/actions)
+[![License](https://img.shields.io/github/license/route-forge/php-thinkphp.svg?style=flat-square)](./LICENSE)
+
 > 文档语言：简体中文（v1 暂不提供英文版）。机器可读概览见 [`llms.txt`](./llms.txt)。
 
 **语言 / Language:** 简体中文 · English *(planned)*

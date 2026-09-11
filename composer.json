@@ -4,6 +4,11 @@
     "license": "MIT",
     "type": "library",
     "homepage": "https://github.com/route-forge/php-thinkphp",
+    "support": {
+        "issues": "https://github.com/route-forge/php-thinkphp/issues",
+        "source": "https://github.com/route-forge/php-thinkphp",
+        "docs": "https://route-forge.github.io/docs/"
+    },
     "authors": [
         {
             "name": "阿杰很厉害",
