@@ -91,11 +91,17 @@ class RouteForgeGenCommand extends Command
         $plannedByFile = [];
         $seenThisRun = [];
         $skipped = 0;
-        $invokable = [];
+        // 三类「不生成、只登记」的行：invokable / unreachable（见 AutoRouteScanner）/ mixedCase
+        $notices = ['invokable' => [], 'unreachable' => [], 'mixedCase' => []];
 
         foreach ($endpoints as $ep) {
             if (!empty($ep['invokable'])) {
-                $invokable[] = $ep;
+                $notices['invokable'][] = $ep;
+                continue;
+            }
+            if (!empty($ep['unreachable'])) {
+                // action_suffix 项目里无可达 URL 的方法：生成它等于凭空新增端点，只登记
+                $notices['unreachable'][] = $ep;
                 continue;
             }
             $key = strtolower($ep['name']);
@@ -105,13 +111,18 @@ class RouteForgeGenCommand extends Command
             }
             $seenThisRun[$key] = true;
             $plannedByFile[$ep['outputRouteFile']][] = $ep;
+
+            // 仅对真正新写入的条目提示大小写风险，已生成过的不再 nag
+            if (!empty($ep['mixedCaseAction'])) {
+                $notices['mixedCase'][] = $ep;
+            }
         }
 
         // 4) 悬空提醒（生成文件里有、现实已无对应控制器/方法）
         $stale = $this->collectStale($scanner, $mode, $modules);
 
         // 5) 报告 + 落盘
-        return $this->emit($output, $plannedByFile, $skipped, $stale, $invokable, $dryRun, $scanner, $mode, $modules);
+        return $this->emit($output, $plannedByFile, $skipped, $stale, $notices, $dryRun);
     }
 
     /**
@@ -231,6 +242,7 @@ class RouteForgeGenCommand extends Command
     {
         $stale = [];
         $namespace = $this->app->getNamespace();
+        $suffix = (string) $this->app->config->get('route.action_suffix', '');
 
         foreach ($this->targetFiles($scanner, $mode, $modules) as $file) {
             if (!is_file($file)) {
@@ -252,10 +264,15 @@ class RouteForgeGenCommand extends Command
 
             foreach ($mm as $set) {
                 [, $target, $name] = $set;
-                $class = $this->classFromTarget($nsPrefix, $target);
+                $class  = $this->classFromTarget($nsPrefix, $target);
                 $action = substr($target, (int) strrpos($target, '/') + 1);
+                // target 里的动作段是剔掉 action_suffix 的短形式（与自动路由一致），
+                // 故按 think 的同一规则判定：短形式命中、或拼回 suffix 命中都算存在。
+                $exists = $action === ''
+                    || method_exists($class, $action)
+                    || ($suffix !== '' && method_exists($class, $action . $suffix));
 
-                if (!class_exists($class) || ($action !== '' && !method_exists($class, $action))) {
+                if (!class_exists($class) || !$exists) {
                     $stale[] = [
                         'file' => $file,
                         'name' => $name,
@@ -303,18 +320,15 @@ class RouteForgeGenCommand extends Command
     /**
      * @param array<string, list<array<string,mixed>>> $plannedByFile
      * @param list<array{file:string,name:string,why:string}> $stale
-     * @param list<array<string,mixed>> $invokable
+     * @param array{invokable:list<array<string,mixed>>,unreachable:list<array<string,mixed>>,mixedCase:list<array<string,mixed>>} $notices
      */
     private function emit(
         Output $output,
         array $plannedByFile,
         int $skipped,
         array $stale,
-        array $invokable,
+        array $notices,
         bool $dryRun,
-        AutoRouteScanner $scanner,
-        string $mode,
-        array $modules,
     ): int {
         $totalNew = array_sum(array_map('count', $plannedByFile));
 
@@ -350,10 +364,35 @@ class RouteForgeGenCommand extends Command
         if ($skipped > 0) {
             $output->writeln("跳过（已定义）：{$skipped} 条");
         }
-        foreach ($invokable as $ep) {
+        foreach ($notices['invokable'] as $ep) {
             $output->writeln('<comment>提示：invokable 控制器 ' . $ep['class']
                 . ' 请手写显式规则（v1 不自动生成）。</comment>');
         }
+
+        if ($notices['unreachable'] !== []) {
+            $total    = count($notices['unreachable']);
+            $examples = implode('、', array_map(
+                static fn (array $ep): string => $ep['class'] . '::' . $ep['method'],
+                array_slice($notices['unreachable'], 0, 3),
+            )) . ($total > 3 ? ' 等' : '');
+
+            $output->writeln("<comment>提示：{$total} 个方法在当前 route.action_suffix 下没有可达 URL（{$examples}）——"
+                . 'think 是「URL 段 + action_suffix」才命中方法名，生成它们等于凭空新增端点，'
+                . '故本次未写入。请手写显式规则，或按你的 suffix 约定调整方法名。</comment>');
+        }
+
+        if ($notices['mixedCase'] !== []) {
+            $total    = count($notices['mixedCase']);
+            $examples = implode('、', array_map(
+                static fn (array $ep): string => $ep['uri'],
+                array_slice($notices['mixedCase'], 0, 3),
+            )) . ($total > 3 ? ' 等' : '');
+
+            $output->writeln("<comment>注意：{$total} 条沿用了 camelCase 动作段（{$examples}）。"
+                . '默认 url_case_sensitive=false 时新旧大小写写法都能命中；若你把 url_case_sensitive 设为 true，'
+                . '历史上自动路由靠大小写不敏感命中的小写写法物化成显式规则后会 404，需要自行改写规则。</comment>');
+        }
+
         foreach ($stale as $s) {
             $output->writeln("<comment>提醒：{$s['file']} 中的 ->name('{$s['name']}') 已悬空（{$s['why']}），可自行清理（命令不会删除）。</comment>");
         }

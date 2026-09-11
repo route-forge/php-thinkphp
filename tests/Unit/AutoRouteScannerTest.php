@@ -71,9 +71,47 @@ class AutoRouteScannerTest extends TestCase
         sort($names);
 
         self::assertSame(
-            ['admin.dashboard.index', 'admin.dashboard.stat', 'user.index', 'user.read', 'user.save'],
+            ['admin.dashboard.index', 'admin.dashboard.stat', 'user.batchImport', 'user.index', 'user.read', 'user.save'],
             $names,
         );
+    }
+
+    /**
+     * 动作段沿用方法名原样 → camelCase 方法产出 snake+camel 混排 URL，
+     * 必须打标记供命令层提示大小写风险；全小写的不能误报。
+     */
+    public function testFlagsMixedCaseActionSegment(): void
+    {
+        $byName = $this->indexByName($this->scanner());
+
+        self::assertTrue($byName['user.batchImport']['mixedCaseAction']);
+        self::assertSame('user/batchImport', $byName['user.batchImport']['uri']);
+        self::assertFalse($byName['user.read']['mixedCaseAction']);
+    }
+
+    /**
+     * action_suffix='View'：think 拿「URL 段 + suffix」去命中方法，故
+     * listView 的可达 URL 是短形式 report/list（生成成 report/listView 会与现状 URL 不符，
+     * 切强制路由后旧链接 404）；不以 suffix 结尾的方法无可达 URL，标 unreachable 不生成。
+     */
+    public function testActionSuffixDerivesShortUrlAndMarksUnreachable(): void
+    {
+        $byName = [];
+        foreach ($this->scannerAt('SuffixApp')->scan('single') as $ep) {
+            $byName[$ep['name']] = $ep;
+        }
+
+        $names = array_keys($byName);
+        sort($names);
+        self::assertSame(['report.export', 'report.index', 'report.list'], $names);
+
+        $list = $byName['report.list'];
+        self::assertSame('report/list', $list['uri']);
+        self::assertSame('report/list', $list['target']);
+        self::assertSame('listView', $list['method'], 'method 必须是真实方法名，供悬空校验反查');
+        self::assertArrayNotHasKey('unreachable', $list);
+
+        self::assertTrue($byName['report.export']['unreachable'], 'export() 在该 suffix 下无可达 URL');
     }
 
     public function testExcludesNonEndpointMethods(): void

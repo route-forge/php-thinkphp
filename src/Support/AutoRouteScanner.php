@@ -75,14 +75,15 @@ final class AutoRouteScanner
     /**
      * 扫描可自动路由的端点。
      *
-     * @param string      $mode        'single' | 'multi'
+     * @param string      $mode        'single' | 'multi'（'ambiguous' 由命令层拦下，不会进到这里）
      * @param string[]    $modules     multi 模式下要扫的模块（已由命令层保证非空）
      * @param string|null $pathFilter  仅扫描此目录（绝对路径，须落在候选根内）
      * @param string|null $nsFilter    仅扫描此命名空间前缀（不含 app 根命名空间也可，按后缀匹配）
      *
      * @return list<array{
      *   outputRouteFile:string, targetFile:string, uri:string, target:string,
-     *   name:string, class:string, method:string, module:?string
+     *   name:string, class:string, method:string, module:?string,
+     *   mixedCaseAction:bool, invokable?:bool, unreachable?:bool
      * }>
      */
     public function scan(string $mode, array $modules = [], ?string $pathFilter = null, ?string $nsFilter = null): array
@@ -128,7 +129,7 @@ final class AutoRouteScanner
                     continue;
                 }
 
-                foreach ($this->controllerEndpoints($class, $root, $mode) as $ep) {
+                foreach ($this->controllerEndpoints($class, $root) as $ep) {
                     $endpoints[] = $ep;
                 }
             }
@@ -140,11 +141,14 @@ final class AutoRouteScanner
     /**
      * 列出某控制器类作为自动路由端点的 public 方法；invokable 控制器返回一条 __invoke 提示项。
      *
+     * `unreachable` 行（action_suffix 项目里方法名不以 suffix 结尾 / 剔完为空段）没有可达
+     * URL，命令层只登记提示、不生成；`mixedCaseAction` 行由命令层提示大小写风险。
+     *
      * @param array{controllerDir:string,namespace:string,module:?string,routeFile:string,uriPrefix:string} $root
      *
-     * @return list<array{outputRouteFile:string,targetFile:string,uri:string,target:string,name:string,class:string,method:string,module:?string,invokable?:bool}>
+     * @return list<array{outputRouteFile:string,targetFile:string,uri:string,target:string,name:string,class:string,method:string,module:?string,mixedCaseAction:bool,invokable?:bool,unreachable?:bool}>
      */
-    private function controllerEndpoints(string $class, array $root, string $mode): array
+    private function controllerEndpoints(string $class, array $root): array
     {
         if (!class_exists($class)) {
             return [];
@@ -179,12 +183,35 @@ final class AutoRouteScanner
             }
 
             $action = $rm->getName();
-            $rows[] = $this->endpoint($root, $controllerSeg, $action, $class, $action, $mode, (bool) $suffix);
+
+            // think 的可达规则：URL 段拼上 action_suffix 才去 is_callable
+            // （Dispatch::responseWithMiddlewarePipeline）。故方法名不以 suffix 结尾
+            // 时根本无 URL 可达（除 __call 兜底），生成它等于凭空新增端点 → 只登记提示。
+            if ($suffix !== '' && !str_ends_with($action, $suffix)) {
+                $rows[] = $this->endpoint($root, $controllerSeg, $action, $class, $action)
+                    + ['unreachable' => true];
+
+                continue;
+            }
+
+            // 可达 URL = 剔掉 suffix 的短形式：batchView 在 suffix=View 时可达于 user/batch，
+            // 生成成 user/batchView 就与现状 URL 不一致（切强制路由后旧链接 404）。
+            if ($suffix !== '' && $action === $suffix) {
+                // 剔完为空段，不构成可达 URL
+                $rows[] = $this->endpoint($root, $controllerSeg, $action, $class, $action)
+                    + ['unreachable' => true];
+
+                continue;
+            }
+
+            $urlAction = $suffix !== '' ? substr($action, 0, -strlen($suffix)) : $action;
+
+            $rows[] = $this->endpoint($root, $controllerSeg, $urlAction, $class, $action);
         }
 
         // invokable 控制器：无自有 public 方法但有 __invoke → 交人写（v1 不自动生成，仅登记提示）
         if ($rows === [] && $rc->hasMethod('__invoke')) {
-            $rows[] = $this->endpoint($root, $controllerSeg, '', $class, '__invoke', $mode, (bool) $suffix)
+            $rows[] = $this->endpoint($root, $controllerSeg, '', $class, '__invoke')
                 + ['invokable' => true];
         }
 
@@ -194,12 +221,16 @@ final class AutoRouteScanner
     /**
      * 组装单个端点描述（uri / name / 显式规则目标串）。
      *
+     * 注意动作段与控制器段的口径差异：控制器段一律 `Str::snake`，动作段沿用
+     * think 反推出的 URL 形式。方法名含大写（`batchImport`）时会产出 snake+camel
+     * 混排 URL —— 记入 `mixedCaseAction`，由命令层提示大小写风险。
+     *
      * @param array{controllerDir:string,namespace:string,module:?string,routeFile:string,uriPrefix:string} $root
      * @param string[] $controllerSeg
      *
-     * @return array{outputRouteFile:string,targetFile:string,uri:string,target:string,name:string,class:string,method:string,module:?string}
+     * @return array{outputRouteFile:string,targetFile:string,uri:string,target:string,name:string,class:string,method:string,module:?string,mixedCaseAction:bool}
      */
-    private function endpoint(array $root, array $controllerSeg, string $action, string $class, string $method, string $mode, bool $hasActionSuffix): array
+    private function endpoint(array $root, array $controllerSeg, string $action, string $class, string $method): array
     {
         // 单应用 target = '控制器/动作'（与自动路由一致，走 Controller 派发、保留控制器中间件）
         // 多应用 target 同为控制器相对串（MultiApp 已按当前模块解析命名空间）
@@ -218,6 +249,7 @@ final class AutoRouteScanner
             'class'           => $class,
             'method'          => $method,
             'module'          => $root['module'],
+            'mixedCaseAction' => $action !== '' && preg_match('/[A-Z]/', $action) === 1,
         ];
     }
 

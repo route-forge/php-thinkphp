@@ -147,6 +147,55 @@ class RouteForgeGenCommandTest extends TestCase
     }
 
     /**
+     * action_suffix='View'：可达条目按短形式生成（think 会自己拼回 suffix 命中方法），
+     * 不以 suffix 结尾的方法无可达 URL → 只登记不写；且二次运行不得把短形式 target 误判成悬空。
+     */
+    public function testActionSuffixGeneratesShortFormAndSkipsUnreachable(): void
+    {
+        copy(
+            dirname(__DIR__) . '/Fixtures/SuffixApp/app/controller/Report.php',
+            $this->root . '/app/controller/Report.php',
+        );
+        file_put_contents($this->root . '/config/route.php', "<?php return ['action_suffix' => 'View'];\n");
+
+        [$exit, $out] = $this->gen($this->app());
+        self::assertSame(0, $exit);
+        $php = (string) file_get_contents($this->outFile());
+
+        self::assertStringContainsString("Route::any('report/list', 'report/list')->name('report.list')", $php);
+        self::assertStringNotContainsString("->name('report.export')", $php);
+        // 夹具里的 User::read 等同样不以 View 结尾 → 一律不可达，生成它们等于凭空新增端点
+        self::assertStringNotContainsString("->name('user.read')", $php);
+        self::assertStringContainsString('没有可达 URL', $out);
+        self::assertStringContainsString('Report::export', $out, '提示要点名是哪个方法');
+
+        // 回归：短形式 target 反查方法名时须拼回 suffix，否则每次运行都报假悬空
+        [$exitSecond, $outSecond] = $this->gen($this->app());
+        self::assertSame(0, $exitSecond);
+        self::assertStringNotContainsString('悬空', $outSecond);
+    }
+
+    /**
+     * 默认无 action_suffix 时，camelCase 方法照其方法名生成，但要给出大小写风险提示：
+     * 自动路由时代 URL 靠 is_callable 大小写不敏感命中，物化后若开了 url_case_sensitive
+     * 则历史小写写法会 404。
+     */
+    public function testMixedCaseActionStillGeneratedWithCaseNotice(): void
+    {
+        [$exit, $out] = $this->gen($this->app());
+        self::assertSame(0, $exit);
+        $php = (string) file_get_contents($this->outFile());
+
+        self::assertStringContainsString("Route::any('user/batchImport', 'user/batchImport')->name('user.batchImport')", $php);
+        self::assertStringContainsString('camelCase 动作段', $out);
+        self::assertStringContainsString('url_case_sensitive', $out);
+
+        // 已生成的条目不再反复 nag
+        [, $outSecond] = $this->gen($this->app());
+        self::assertStringNotContainsString('camelCase 动作段', $outSecond);
+    }
+
+    /**
      * 回归：写盘失败过去不判 file_put_contents 返回值——留下半个文件却报成功。
      * 用「生成目标被目录占位」制造跨平台可控的写失败。
      */
