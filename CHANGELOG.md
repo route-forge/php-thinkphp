@@ -22,6 +22,7 @@
 
 - **命令失败不再向用户倒框架堆栈**：`route:forge:list` / `types` 此前只捕获 `ForgeExceptionContract`，适配层自己的 fail-fast（`url_lazy_route=true`、非 `RuleItem` 规则）直接逃到 console 异常处理器。现在统一只输出可操作消息；且数据产物形态（`list --json` / `types` 的 d.ts/JSON）的失败信息改走 STDERR——此前连 `[RF_BE_008]` 错误文本都会混进产物。
 - **`route:forge:types --out` 的写盘校验在生产运行时永不生效**：ThinkPHP 的错误初始化器把 `file_put_contents` 的 `E_WARNING` 抛成 `ErrorException`，`=== false` 分支轮不到执行（仅在测试里可达）。现以 `@` 抑制后正确判定并报错。
+- **依赖下限 `route-forge/common` `^1.0` → `^1.1.1`**：`^1.0` 允许装上 1.0.0，而它有两处会真炸到使用者的缺口——`match.prefix` / `match.middleware` 传单值字符串（`'prefix' => 'manage'`）直接 `TypeError` 崩溃；`JsSafeEncoder` 缺 `JSON_UNESCAPED_UNICODE`，本包 `levels` 的中文 description 在摘要内嵌里被转成 `\uXXXX`，与「和 laravel 版逐位对齐」的口径不符。现在依赖口径与本地/CI 实测版本一致。
 
 ## [0.0.2] - 2026-09-09
 
