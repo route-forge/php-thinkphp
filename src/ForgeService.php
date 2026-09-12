@@ -29,8 +29,9 @@ use RouteForge\ThinkPHP\Support\AutoRouteScanner;
 use RouteForge\ThinkPHP\Support\ConfigPublisher;
 use RouteForge\ThinkPHP\Support\ManagerConfigStore;
 use RouteForge\ThinkPHP\Support\ManagerPageRenderer;
-use RouteForge\ThinkPHP\Support\ThinkRouteCollection;
 use RouteForge\ThinkPHP\Support\RouteCollector;
+use RouteForge\ThinkPHP\Support\RouteFileLoader;
+use RouteForge\ThinkPHP\Support\ThinkRouteCollection;
 use think\App;
 use think\Service;
 
@@ -89,6 +90,10 @@ class ForgeService extends Service
      */
     protected function registerBindings(): void
     {
+        // 路由文件加载器（list / types / gen 三个命令共用）。必须是单例：它的进程内幂等标志
+        // 要跨命令共享——路由文件被 include 第二遍会注册出**新的** RuleItem 对象，
+        // RouteCollector 的 spl_object_id 去重挡不住，输出会整倍儿重复。
+        $this->app->instance(RouteFileLoader::class, new RouteFileLoader($this->app));
         // 配置发布器（route:forge:publish 与三命令的缺配置守卫共用同一实例）
         $this->app->instance(ConfigPublisher::class, new ConfigPublisher($this->app));
         // 自动路由扫描器（route:forge:gen 使用）
