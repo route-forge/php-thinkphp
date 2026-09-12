@@ -118,6 +118,36 @@ class ManagerConfigSaveTest extends TestCase
     }
 
     /**
+     * 页面里把 match.prefix / match.middleware 写成单值字符串（与 think 的
+     * ->middleware() 同形的直觉写法）必须能保存：common 1.1.2 起生成侧按 (array)
+     * 归一，落盘为等价的单元素数组。
+     *
+     * 本用例就是 composer 下限 ^1.1.2 的实际守卫——装在 1.1.1 会在
+     * exportInlineArray(array) 的类型声明上 TypeError，表现为保存返回 500
+     * 「配置写入失败」，而真正原因藏在日志里。
+     */
+    public function testSingleStringMatchValuesArePersistedAsArrays(): void
+    {
+        $app = AppFactory::create(debug: true, forgeOverrides: ['levels' => []]);
+
+        $levels = [
+            'admin' => [
+                'description' => '后台接口',
+                'match'       => ['prefix' => 'admin', 'middleware' => 'auth'],
+                'load'        => 'lazy',
+            ],
+        ];
+
+        $response = $this->put($app, ['levels' => $levels, 'global' => self::GLOBAL]);
+
+        self::assertSame(200, $response->getCode(), (string) $response->getContent());
+
+        $loaded = $this->readConfigFile($app);
+        self::assertSame(['admin'], $loaded['levels']['admin']['match']['prefix']);
+        self::assertSame(['auth'], $loaded['levels']['admin']['match']['middleware']);
+    }
+
+    /**
      * classifier 是闭包，无法序列化进配置文件——必须拒存而不是抹平成 null。
      */
     public function testSaveIsRefusedWhenClassifierIsConfigured(): void
