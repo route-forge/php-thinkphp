@@ -49,6 +49,7 @@ ThinkPHP 8 适配包。框架无关业务逻辑全部在 `route-forge/common`（
 - **测试里造 JSON 请求体**：`new Request()` 绕过 `__make`，而 `contentType()` 读的是 header 集合（正常由 `__make` 从 `$_SERVER['CONTENT_TYPE']` 派生成**连字符**键），`withHeader()` 只小写化不转连字符。必须 `withHeader(['content-type' => 'application/json'])` 且早于 `withInput()`，否则 raw body 不按 JSON 解析、`$request->put` 停在 null 并在 `input()` 的类型声明上抛 TypeError（`Http::putJson` 已封装）。
 - **404 断言会触发框架模板弃用**：非 debug 且未配 `app.http_exception_template` 时 think 渲染 HTML 异常模板，PHP 8.5 下报 `htmlentities(null)` 弃用（测试输出里那个 `D`）。断 404 的用例统一带 `HTTP_ACCEPT: application/json` 走 JSON 分支，别把这个噪音当成本包 bug。
 - **think 只认 `APP_DEBUG=0/1`**：`.env` 里 `app_debug=false` 字符串对 think env 解析是真值。
+- **`.env` 由 `parse_ini_file` 解析**：注释行里出现引号会让**整份文件**读取失败（返回 `false`），只有一条 Warning、不抛异常，于是 `APP_DEBUG` 静默回落到默认值——「以为关了其实是开的」。写 `.env` 注释只用中文与句读，别放引号（示例项目实测）。
 
 ## 提交纪律
 
