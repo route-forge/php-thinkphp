@@ -11,7 +11,7 @@ ThinkPHP 8 适配包。框架无关业务逻辑全部在 `route-forge/common`（
 
 ## 本地关联（composer.json 提交纪律）
 
-- `composer.json` 的 `repositories`（path → `php-common` + `versions: route-forge/common 1.1.1`）是**本地开发专用**，**禁止提交**。`require` 下限同为 `^1.1.1`（1.0.0 的 `match.prefix` 单值字符串会 `TypeError` 崩、`JsSafeEncoder` 未去 unicode 转义，中文 description 会输出 `\uXXXX`），挂回 path repo 时版本覆盖须与之下限一致。
+- `composer.json` 的 `repositories`（path → `php-common` + `versions: route-forge/common 1.1.2`）是**本地开发专用**，**禁止提交**。`require` 下限同为 `^1.1.2`（1.0.0 的 `match.prefix` 单值字符串会 `TypeError` 崩、`JsSafeEncoder` 未去 unicode 转义会让中文 description 输出 `\uXXXX`；1.1.1 的 `ConfigFileGenerator` 缺生成侧单值归一，管理器保存 `"prefix": "admin"` 这种写法会 500），挂回 path repo 时版本覆盖须与之下限一致。
 - `composer.json` 允许提交的必要字段仅限：`autoload.files`（`src/Support/functions.php`）与 `extra.think.services`（`ForgeService`）。
 - 提交 `composer.json` 前先剥离 `repositories`，提交后再写回本地（保持工作树 dirty，符合「本地关联不入库」约定）。
 
