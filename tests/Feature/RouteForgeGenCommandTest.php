@@ -6,6 +6,8 @@ namespace RouteForge\ThinkPHP\Tests\Feature;
 
 use PHPUnit\Framework\TestCase;
 use RouteForge\ThinkPHP\ForgeService;
+use RouteForge\ThinkPHP\Support\RouteCollector;
+use RouteForge\ThinkPHP\Support\RouteFileLoader;
 use think\App;
 use think\console\Input;
 use think\console\Output;
@@ -98,6 +100,35 @@ class RouteForgeGenCommandTest extends TestCase
         // 过滤：非端点方法不出现
         self::assertStringNotContainsString("->name('user.secret')", $php);
         self::assertStringNotContainsString('staticish', $php);
+    }
+
+    /**
+     * 回归：产物必须是**能被 include 的合法 PHP**。
+     * 1.1.0 的 HEADER 在双引号串里多写了一层转义，落盘成 `use think\\facade\\Route;`
+     * 直接 ParseError；旧用例只对条目文本做 assertStringContainsString，从没真正加载过
+     * 产物，所以缺陷一直隐身——而 route/*.php 在 HTTP 与 console 都会被 include，
+     * 等于跑一次 gen 就把整个应用打挂。
+     */
+    public function testGeneratedFileIsLoadablePhp(): void
+    {
+        $this->gen($this->app());
+        $php = (string) file_get_contents($this->outFile());
+
+        self::assertStringContainsString('use think\facade\Route;', $php, 'use 行必须是单反斜杠');
+        self::assertStringNotContainsString('think\\\\facade', $php, '双反斜杠会让产物不是合法 PHP');
+
+        // 真正的判据：走一遍加载器，产物里的规则要能进规则树
+        $app    = $this->app();
+        $loader = new RouteFileLoader($app);
+        $loader->load();
+
+        $rules = [];
+        foreach ((new RouteCollector($app->route))->collect() as $item) {
+            $rules[] = (string) $item->getRule();
+        }
+
+        self::assertContains('user/read', $rules, '生成文件加载后规则应可见');
+        self::assertContains('admin/dashboard/index', $rules);
     }
 
     public function testIdempotentSecondRunAddsNothing(): void

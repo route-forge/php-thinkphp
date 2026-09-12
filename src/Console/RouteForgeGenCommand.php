@@ -27,12 +27,19 @@ use think\facade\Route;
  */
 class RouteForgeGenCommand extends Command
 {
+    /**
+     * 生成文件的头部。`use` 那行**必须**用单引号串：双引号里想落一个反斜杠要写 `\\`，
+     * 此前写成 `\\\\` 于是落盘成两个反斜杠，产物 `use think\\facade\\Route;` 直接
+     * ParseError（1.1.0 的 gen 产物因此从来不是合法 PHP；route/*.php 在 HTTP 与 console
+     * 都会被 include，等于跑一次 gen 就把整个应用打挂）。也不能退回双引号写 `\f`——
+     * PHP 的双引号里 `\f` 是换页符。
+     */
     private const HEADER = "<?php\n// +---------------------------------------------------------------\n"
         . "// | route-forge/thinkphp 自动生成，请勿手工编辑本区块以外的内容。\n"
         . "// | route:forge:gen 只在此文件末尾追加新规则、绝不删除；要删改请直接编辑本文件。\n"
         . "// | 每条默认未分层（落 unassigned），按需补 ->tier(...)。\n"
         . "// +---------------------------------------------------------------\n"
-        . "use think\\\\facade\\\\Route;\n\n";
+        . 'use think\facade\Route;' . "\n\n";
 
     protected function configure(): void
     {
