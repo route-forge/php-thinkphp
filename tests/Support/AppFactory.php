@@ -23,10 +23,16 @@ final class AppFactory
      */
     private static array $roots = [];
 
-    public static function create(bool $debug = false, array $forgeOverrides = [], ?\Closure $classifier = null, bool $lazyRoute = false, bool $writeForgeConfig = true): App
+    /**
+     * @param array<string,string> $routeFiles 相对 route/ 的路径 => 文件内容；
+     *                                         用于覆盖「路由来自路由文件」这条真实加载路径
+     *                                         （测试代码直接 Route::get() 注册是另一条路，
+     *                                         1.1.0 的命令侧缺陷正是被它整体遮蔽掉的）
+     */
+    public static function create(bool $debug = false, array $forgeOverrides = [], ?\Closure $classifier = null, bool $lazyRoute = false, bool $writeForgeConfig = true, array $routeFiles = []): App
     {
         $root = self::makeRoot();
-        self::writeConfigs($root, $debug, $forgeOverrides, $lazyRoute, $writeForgeConfig);
+        self::writeConfigs($root, $debug, $forgeOverrides, $lazyRoute, $writeForgeConfig, $routeFiles);
 
         $app = new App($root);
         $app->initialize();
@@ -73,11 +79,23 @@ final class AppFactory
         return $root;
     }
 
-    private static function writeConfigs(string $root, bool $debug, array $forgeOverrides, bool $lazyRoute = false, bool $writeForgeConfig = true): void
+    private static function writeConfigs(string $root, bool $debug, array $forgeOverrides, bool $lazyRoute = false, bool $writeForgeConfig = true, array $routeFiles = []): void
     {
         $put = static function (string $rel, string $content) use ($root): void {
             file_put_contents($root . DIRECTORY_SEPARATOR . $rel, $content);
         };
+
+        // 路由文件先落盘：下面的「未发布 forge 配置」分支会提前 return，不能写在它之后
+        foreach ($routeFiles as $rel => $content) {
+            $normalized = str_replace(['\\', '/'], DIRECTORY_SEPARATOR, $rel);
+            $dir        = dirname($root . DIRECTORY_SEPARATOR . 'route' . DIRECTORY_SEPARATOR . $normalized);
+
+            if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir)) {
+                throw new \RuntimeException('mkdir failed: ' . $dir);
+            }
+
+            $put('route' . DIRECTORY_SEPARATOR . $normalized, $content);
+        }
 
         // .env：think 只认 APP_DEBUG=0/1（'false' 字符串为真值，勿用）
         $put('.env', 'APP_DEBUG=' . ($debug ? '1' : '0') . "\n");
