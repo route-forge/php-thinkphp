@@ -84,6 +84,20 @@ PHP;
         self::assertSame([], $loader->warnings());
     }
 
+    public function testDirectoryMatchingGlobIsSkipped(): void
+    {
+        $app    = AppFactory::create(routeFiles: ['app.php' => self::APP_ROUTES]);
+        $loader = new RouteFileLoader($app);
+
+        // route:forge:gen 写失败会留下同名占位目录；glob('*.php') 连目录一起匹配，
+        // 而 include 目录只抛 E_WARNING（think 的 Error 初始化器会转成 ErrorException）
+        mkdir($app->http->getRoutePath() . 'forge.auto.php');
+
+        $loader->load();
+
+        self::assertContains('probe/ping', $this->rules($app), '异常目录不该妨碍同目录下的正常路由文件');
+    }
+
     public function testLoadIsIdempotentWithinProcess(): void
     {
         $app    = AppFactory::create(routeFiles: ['app.php' => self::APP_ROUTES]);

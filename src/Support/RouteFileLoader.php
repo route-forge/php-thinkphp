@@ -65,6 +65,14 @@ final class RouteFileLoader
                 sort($files);
 
                 foreach ($files as $file) {
+                    // 比 Http::loadRoutes() 更严的一点：glob 也会匹配到**目录**（如写失败留下的
+                    // 同名占位目录），include 目录只抛 E_WARNING，而 think 的 Error 初始化器
+                    // 会把 warning 转成 ErrorException——一条形态异常的目录就能打挂整条命令。
+                    // 不可读文件不在过滤之列：那是真故障，该响。
+                    if (!is_file($file)) {
+                        continue;
+                    }
+
                     self::includeFile($file);
                 }
             }
