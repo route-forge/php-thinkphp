@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.1] - 2026-09-13
+
+### Added
+
+- **Windows 下的命令着色自愈（`route:forge:*` 观感与 Laravel 版对齐）**：包内五命令一直在用 think console 的 `<info>` / `<comment>` / `<error>` 标签（层级统计、别名黄行、撞车红行、失败提示），但在 Windows 上全部退化为纯文本。根因在框架而非本包：`think\console\output\driver\Console::hasColorSupport()` 的 Windows 分支要求系统版本号**精确等于** `10.0.10586`（Win10 1511 的首发版号，symfony 2.x 时代抄来的写法），且只认 `TERM` **严格等于** `xterm`，于是 Win11（如 `10.0.26200`）与 Git Bash（`TERM=xterm-256color`）恒判「不支持颜色」，标签被 `Formatter` 剥掉却不写 ANSI 码；Linux/macOS 走 `posix_isatty` 分支所以正常。Laravel 侧之所以有颜色，是 symfony/console 早已把这条判据换成 `>=` + `WT_SESSION` + 主动启用 VT 模式。
+  - 新增 `src/Support/ConsoleColorDetector.php`：Windows 下改为「版本号 ≥ 10.0.10586 **且** PHP 成功开启控制台 VT 模式」，并识别 Windows Terminal（`WT_SESSION`）、mintty / Git Bash（`MSYSCON`）、ConEmu（`ConEmuANSI=ON`）、ansicon/cmder 与带后缀的 `TERM`。VT 启用成功还兼作「背后是真控制台」的第二证据（管道/重定向下该调用必然失败，不会因此误染色）。判定核心 `decide()` 是纯函数（环境、控制台、os 家族、版本号、VT 状态全部注入），故 Windows 分支在任意平台上都可单测。
+  - 新增 `src/Console/Concerns/EnsuresAnsiOutput.php` 并接入五命令的 `execute()`：时序上 `Console::run()` 的 `configureIO()` 先跑、之后才到 `execute()`，所以覆盖 `setDecorated()` 安全且天然早于任何一次 `writeln()`。只调框架公开 API，不重绑、不反射任何框架对象，零侵入约定不变。
+  - **取向偏保守**：`stdout` 不是终端（管道、重定向、CI）时一律不上色，`route:forge:list --json` 与 `route:forge:types` 的产物里不会混入 ANSI 转义码；遵守 `NO_COLOR` 与 `TERM=dumb`；个别终端下 PHP 认不出控制台时宁可不上色，也不把 `←[32m` 这类乱码写进终端。
+  - **显式表态优先**：命令带 `--ansi` / `--no-ansi` 时本包完全不介入（框架的 `configureIO` 已处理），`--ansi` 同时是自动判定过保守时的逃生舱。think 的 `Buffer` / `Nothing` 输出驱动压根没有 `setDecorated`，此处静默降级，不牵动包内测试与非 console 输出场景。
+  - **验证**：示例项目（`vendor/route-forge/thinkphp` 为符号链接，改动即时生效）在管道下实测 ANSI 转义序列计数——`list` / `types` 默认 `0`、`--ansi` `26`、`--no-ansi` `0`、`--json`（连 `--json --ansi` 也是）恒 `0` 且 `json_decode` 正常、`clear` / `publish --ansi` 各 `2`；包内 145 → 156 例全绿（检测器 8 例 + trait 契约 3 例）。「终端真出颜色」这层包内 `Buffer` 驱动验不到（它压根不过 `Formatter`），由维护者在**主终端 PowerShell 7.6.5（Windows Terminal 宿主）**与 Git Bash、git-cmd、cmd 四类终端确认真实交互下 `stream_isatty(STDOUT)` 与 `sapi_windows_vt100_support(STDOUT, true)` 均为 true——即 conhost 路径与第三方终端路径各自独立成立，自愈必然放行（着色取决于控制台宿主是否支持 VT，与 PowerShell 版本无直接关系）。
+  - 命令选项、端点与摘要结构、错误码集合均无变化，JSON/TS 产物字节不变，故为补丁版本。文档同步于 README「终端着色」与「与 Laravel 版的差异」、`llms.txt`。
+
 ## [1.2.0] - 2026-09-13
 
 ### Fixed

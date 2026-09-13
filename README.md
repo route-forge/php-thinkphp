@@ -157,6 +157,15 @@ php think route:forge:publish
 php think route:forge:gen
 ```
 
+#### 终端着色
+
+五条命令的提示语沿用 think console 的 `<info>` / `<comment>` / `<error>` 标签（层级统计、别名黄行、撞车红行同理）。think 自带的着色检测在 Windows 上有一条陈旧判据：它要求系统版本号**精确等于** `10.0.10586`（Win10 1511 的首发版号），且只认 `TERM` 严格等于 `xterm`——于是 Win11 与 Git Bash（`TERM=xterm-256color`）统统被判成「不支持颜色」，标签被剥成纯文本。本包在命令层重做这道判定（`ConsoleColorDetector`），使观感与 Laravel 版一致：
+
+- Windows 下改为「版本号 ≥ 10.0.10586 **且** PHP 成功开启控制台 VT 模式」，并识别 Windows Terminal（`WT_SESSION`）、mintty / Git Bash（`MSYSCON`）、ConEmu、cmder 以及带后缀的 `TERM`；
+- `stdout` 不是终端（管道、重定向、CI）时一律不上色——`route:forge:list --json` 与 `route:forge:types` 的产物里永远不会混入 ANSI 转义码；
+- 遵守 `NO_COLOR` 与 `TERM=dumb`；
+- 显式表态优先：命令带上 `--ansi` 或 `--no-ansi` 时本包完全不介入，判定交回框架。`--ansi` 同时是自动判定偏保守时的逃生舱——个别终端下 PHP 认不出控制台（判不出就宁可不上色，免得把 `←[32m` 这类乱码写进终端），加上它即可。
+
 ### 路由别名（改名迁移 / 长期稳定对外名）
 
 ```php
@@ -257,6 +266,7 @@ ThinkPHP 侧的落地差异：
 | 配置发布 | `vendor:publish`（Laravel 原生） | `php think route:forge:publish` 命令复制默认配置；未复制时运行其他命令会 warning + 交互式提示复制 |
 | 管理器页面 | Blade 模板 `view('forge::manager')`；保存裸写 `config/forge.php`，随后删 `bootstrap/cache/config.php` | 包内自包含 HTML 直出（不依赖 `topthink/think-view`）；保存前自动备份，写后清 `runtime/config.php` + 路由元信息缓存 |
 | 命令警告输出 | stderr（`--out` 时 stdout 产物纯净） | think console 无独立 stderr 流，直写 `STDERR`，stdout 产物同样纯净 |
+| Windows 终端着色 | symfony/console 的检测已跟进（Win10 1511+ / Windows Terminal 自动生效） | think 的检测要求版本号**精确等于** `10.0.10586` 且 `TERM` 严格等于 `xterm`，Win11 与 Git Bash 恒判「无色」；本包在命令层重做该判定对齐观感，框架原生 `--ansi` / `--no-ansi` 仍优先（见「终端着色」） |
 | `@forgeSummary` 指令 | Blade 指令 | 全局 helper `forge_summary()`（模板 `{:forge_summary()}`） |
 | 连续多次 `->forgeAlias()` | 合并（宏内部 merge） | **覆盖**（`setOption` 语义）：所有别名须在一次调用中声明 |
 
