@@ -42,6 +42,15 @@ class RouteForgeGenCommand extends Command
         . "// +---------------------------------------------------------------\n"
         . 'use think\facade\Route;' . "\n\n";
 
+    /**
+     * 1.1.0 产物的坏写法（本常量真身：`use think\\facade\\Route;`，两个连续反斜杠）。
+     * 单引号里要写四道反斜杠才落两个——与 HEADER 那次修复正好互为镜像。
+     */
+    private const LEGACY_BROKEN_USE = 'use think\\\\facade\\\\Route;';
+
+    /** 与上面对照的正确写法（提示里让用户照抄）；单引号里一道反斜杠即落一个。 */
+    private const LEGACY_BROKEN_USE_CORRECT = 'use think\facade\Route;';
+
     protected function configure(): void
     {
         $this->setName('route:forge:gen')
@@ -97,6 +106,23 @@ class RouteForgeGenCommand extends Command
         //    否则 route/app.php 里已有的名字查不到，幂等跳过形同虚设、会重复生成。
         //    gen 只消费名称表，故不并入加载器的子目录/with_route 提示——多应用产物落在
         //    app/{模块}/route/ 下，套那条提示会误报。
+        $targets = $this->targetFiles($scanner, $mode, $modules);
+
+        // 旧坏产物必须早于 load() 拦下：加载器会 include route/ 下这些文件，
+        // 而 1.1.0 写出的头部不是合法 PHP，include 就是 ParseError 堆栈。
+        // 本命令只增不删，不自动改写上历史文件——报清楚修法让人自己拍板。
+        $legacy = $this->legacyBrokenFiles($targets);
+        if ($legacy !== []) {
+            $output->writeln('<error>生成文件头部是 1.1.0 的坏写法（use 行含双反斜杠），不是合法 PHP：'
+                . implode('、', $legacy) . '</error>');
+            $output->writeln('<comment>加载它会让整个应用 ParseError（route/*.php 在 HTTP 与 console 都会被 include）。'
+                . '二选一后重跑本命令：</comment>');
+            $output->writeln('  1) 把那行手工改成 ' . self::LEGACY_BROKEN_USE_CORRECT . '；');
+            $output->writeln('  2) 删掉该文件后重跑（本命令幂等，条目会重新生成）。');
+
+            return 1;
+        }
+
         $loader->load();
         $existing = $this->existingNames($scanner, $mode, $modules);
 
@@ -230,6 +256,36 @@ class RouteForgeGenCommand extends Command
         }
 
         return [$this->app->getRootPath() . 'route' . DIRECTORY_SEPARATOR . 'forge.auto.php'];
+    }
+
+    /**
+     * 检出 1.1.0 写坏的旧产物（头部 use 行含双反斜杠，不是合法 PHP）。
+     *
+     * 只读文件头部若干字节：坏写法必然来自 HEADER（总在文件开头），用户此后手工追加的
+     * 内容不参与判定。刻意不做通用 lint（不 shell 出去调 php -l），也不该误判正确产物——
+     * 正确形态是单反斜杠，不含这个 needle。
+     *
+     * @param string[] $files
+     *
+     * @return string[] 命中的文件路径
+     */
+    private function legacyBrokenFiles(array $files): array
+    {
+        $bad = [];
+
+        foreach ($files as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            $head = (string) file_get_contents($file, false, null, 0, 400);
+
+            if (str_contains($head, self::LEGACY_BROKEN_USE)) {
+                $bad[] = $file;
+            }
+        }
+
+        return $bad;
     }
 
     /**

@@ -131,6 +131,30 @@ class RouteForgeGenCommandTest extends TestCase
         self::assertContains('admin/dashboard/index', $rules);
     }
 
+    /**
+     * 回归：1.1.0 写坏的历史产物必须**早于加载**被拦下。
+     * 加载器会 include route/ 下的路由文件，而坏头部不是合法 PHP，include 就是
+     * ParseError 堆栈；命令只增不删，故只报可操作修法，不自动改写上历史文件。
+     */
+    public function testLegacyBrokenProductIsBlockedBeforeLoading(): void
+    {
+        file_put_contents(
+            $this->outFile(),
+            "<?php\nuse think\\\\facade\\\\Route;\nRoute::any('ghost/go', 'ghost/go')->name('ghost.go');\n"
+        );
+        $before = (string) file_get_contents($this->outFile());
+
+        [$exit, $out] = $this->gen($this->app());
+
+        self::assertSame(1, $exit, '坏产物应在加载前被拦下，而不是抛 ParseError');
+        self::assertStringContainsString('1.1.0 的坏写法', $out);
+        self::assertStringContainsString('use think\facade\Route;', $out, '提示要给出可照抄的正确写法');
+        self::assertSame($before, (string) file_get_contents($this->outFile()), '不得往坏文件里追加');
+
+        [$dryExit] = $this->gen($this->app(), ['--dry-run']);
+        self::assertSame(1, $dryExit, 'dry-run 同样会加载路由文件，必须一起拦下');
+    }
+
     public function testIdempotentSecondRunAddsNothing(): void
     {
         $app = $this->app();
