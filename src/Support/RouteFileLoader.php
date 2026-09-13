@@ -32,8 +32,12 @@ use think\event\RouteLoaded;
  * **新的 RuleItem 对象**，`RouteCollector` 的 spl_object_id 去重挡不住，输出会整倍儿重复；
  * 故本类由 `ForgeService` 绑成容器单例，同进程内的多个命令共用这一个标志。
  *
- * 零侵入说明：只做「加载」这件事——不碰 `Route::clear()`、不改 `lazy()`、不重绑任何框架对象，
- * 加载结果与 HTTP 请求走完后规则树的样子一致。
+ * 零侵入说明：加载姿势参照官方 `think\console\command\RouteList`（命令内自己 include、
+ * 之后才 trigger 事件、非文件命中不 include），但**刻意不跟**它两处破坏框架状态的动作：
+ *   - `Route::clear()` —— 会连服务注册的 forge 端点与已注册名称表一起清掉，属破坏性；
+ *   - `lazy(false)`   —— 不去翻框架对象的开关，懒解析交给 `RouteCollector` 的 fail-fast。
+ * 因此本类对规则树**只增不减**，且不重绑任何框架对象；加载结果只在当前进程内存在，
+ * 进程退出即消失，不影响后续 HTTP 请求。
  */
 final class RouteFileLoader
 {
@@ -65,9 +69,10 @@ final class RouteFileLoader
                 sort($files);
 
                 foreach ($files as $file) {
-                    // 比 Http::loadRoutes() 更严的一点：glob 也会匹配到**目录**（如写失败留下的
-                    // 同名占位目录），include 目录只抛 E_WARNING，而 think 的 Error 初始化器
-                    // 会把 warning 转成 ErrorException——一条形态异常的目录就能打挂整条命令。
+                    // 判据照搬官方 route:list：think\console\command\RouteList::scanRoute() 用
+                    // DirectoryIterator 且显式判 getType()==='file' 才 include（只有
+                    // Http::loadRoutes() 的裸 glob 不判，撞上同名目录会抛 E_WARNING，
+                    // 而 think 的 Error 初始化器把 warning 转成 ErrorException）。
                     // 不可读文件不在过滤之列：那是真故障，该响。
                     if (!is_file($file)) {
                         continue;

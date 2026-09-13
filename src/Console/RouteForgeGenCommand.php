@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RouteForge\ThinkPHP\Console;
 
 use RouteForge\ThinkPHP\Support\AutoRouteScanner;
+use RouteForge\ThinkPHP\Support\RouteFileLoader;
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
@@ -18,7 +19,7 @@ use think\facade\Route;
  *
  * 语义（刻意保守）：
  *   - 只新增、绝不删除：命令永远不动已有规则；删除由开发者自己完成；
- *   - 幂等：已在实时路由表里、或已在生成文件里的名字 → 跳过；
+ *   - 幂等：已在实时路由表里（含 route/*.php 经加载器灌进来的）、或已在生成文件里的名字 → 跳过；
  *   - 悬空提醒：生成文件里有、但对应控制器/方法已不存在 → 只报告，不改动；
  *   - 生成条目不写 tier（先落 unassigned），以 `// ->tier('…') 待填` 注释提示分层；
  *   - 目标串走 Controller 派发（与自动路由行为等价，保留控制器中间件）。
@@ -57,7 +58,7 @@ class RouteForgeGenCommand extends Command
         return $this->app->invoke([$this, 'handle'], [$input, $output]);
     }
 
-    public function handle(Input $input, Output $output, AutoRouteScanner $scanner): int
+    public function handle(Input $input, Output $output, AutoRouteScanner $scanner, RouteFileLoader $loader): int
     {
         $dryRun = (bool) $input->getOption('dry-run');
         $path = $input->getOption('path');
@@ -89,8 +90,14 @@ class RouteForgeGenCommand extends Command
             return 1; // resolveModules 已输出错误
         }
 
-        // 2) 现有名字（实时表 + 生成文件），用于幂等跳过
-        $this->app->event->trigger(\think\event\RouteLoaded::class);
+        // 2) 现有名字（实时表 + 生成文件），用于幂等跳过。
+        //    实时表读的是 Route::getName(null)，而 think 只在 HTTP 侧由 Http::loadRoutes()
+        //    include 路由文件（RouteLoaded 只是加载完毕的通知，监听者仅来自服务包的
+        //    loadRoutesFrom），所以命令里必须按官方 route:list 的姿势自己加载一遍，
+        //    否则 route/app.php 里已有的名字查不到，幂等跳过形同虚设、会重复生成。
+        //    gen 只消费名称表，故不并入加载器的子目录/with_route 提示——多应用产物落在
+        //    app/{模块}/route/ 下，套那条提示会误报。
+        $loader->load();
         $existing = $this->existingNames($scanner, $mode, $modules);
 
         // 3) 扫描 + 去重

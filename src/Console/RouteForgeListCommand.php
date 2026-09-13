@@ -10,6 +10,7 @@ use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
 use RouteForge\ThinkPHP\Console\Concerns\ReportsCommandFailure;
 use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
+use RouteForge\ThinkPHP\Support\RouteFileLoader;
 use RuntimeException;
 use think\console\Command;
 use think\console\Input;
@@ -47,13 +48,15 @@ class RouteForgeListCommand extends Command
         return $this->app->invoke([$this, 'handle'], [$input, $output]);
     }
 
-    public function handle(Input $input, Output $output, RouteAnalyzer $analyzer, ThinkRouteNormalizer $normalizer): int
+    public function handle(Input $input, Output $output, RouteAnalyzer $analyzer, ThinkRouteNormalizer $normalizer, RouteFileLoader $loader): int
     {
         // config/forge.php 未发布时：json 形态只 STDERR 指路，table 形态交互式提示复制
         $this->guardConfigPublished($input, $output, (bool) $input->getOption('json'));
 
-        // 命令流中路由文件尚未加载（think RouteList 同款姿势），触发加载
-        $this->app->event->trigger(\think\event\RouteLoaded::class);
+        // ThinkPHP 8 只在 HTTP 侧由 Http::loadRoutes() include 路由文件，RouteLoaded 事件是
+        // 「加载完毕」的通知（监听者只来自服务包的 loadRoutesFrom），光 trigger 一条应用路由
+        // 都进不了规则树——框架自带 route:list 也是自己 scanRoute 完才 trigger 的。
+        $loader->load();
 
         $levels = array_keys((array) $this->app->config->get('forge.levels', []));
 
@@ -88,6 +91,9 @@ class RouteForgeListCommand extends Command
         $warnings = array_merge(
             $analysis['warnings'],
             \RouteForge\ThinkPHP\Support\OptionTypoScanner::scan($collection),
+            // 结构性提示：哪些路由文件按运行时口径压根不会被加载（route/ 子目录、app.with_route=false）。
+            // 复用既有 warnings 通道（STDERR 与 --json 的 warnings 字段同现），不新造输出形态。
+            $loader->warnings(),
         );
         $aliases  = $analysis['aliases'];
         $rows     = $analyzer->filterRows($analysis['rows'], $filterLevel, $onlyUnassigned, $onlyAliases);
