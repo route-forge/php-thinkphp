@@ -5,7 +5,7 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.2.2] - 2026-09-13
 
 ### Added
 
@@ -14,6 +14,8 @@
   - think console 只有 `info` / `error` / `comment` / `question` / `highlight` / `warning` 六个具名样式，没有品红，故用 `Formatter` 支持的内联标签 `<fg=magenta>`（渲染为 `ESC[35m … ESC[39m`）。表格宽度计算本就按去标签后的可见文本，列对齐不受影响。
   - **零契约变更**：只作用于 table 形态，`--json` 与 `route:forge:types` 产物仍是纯文本、字节不变；命令选项与错误码集合无变化。
   - 回归测试：新增 `CommandTest::testListTableColorizesUnassignedRowsMagenta`（未分级行品红、别名黄通道未被抢走、`--json` 不含任何标签），本包 156 → 157 例全绿。`Buffer` 驱动不过 `Formatter`，故包内断言的是原始标签文本；真实 ANSI 由示例项目 `--ansi` 管道下核验（未分级行 4 段 `ESC[35m`，默认管道与 `--json --ansi` 恒为 0）。
+  - 顺带纠正一处**两端偏差**：SPEC §3.2 的表格说明里「落在 `unassigned` 特殊层级的路由整行以品红显示」早已规定（与统计行的 warn 提示互为冗余），Laravel 版一直是 `<fg=magenta>`，think 侧漏做了。本次是补齐合规，不是新增契约。
+  - 文档同步于 README 的「终端着色」小节与 `llms.txt` 的命令一节。零破坏性变更，故为补丁版本。
 
 ## [1.2.1] - 2026-09-13
 
