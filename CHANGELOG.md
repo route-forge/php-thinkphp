@@ -5,6 +5,23 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.0] - 2026-09-13
+
+### Fixed
+
+- **命令场景收集不到 `route/*.php` 注册的路由（`route:forge:list` / `route:forge:types` 在真实项目里不可用）**：三命令原先只 `event->trigger(RouteLoaded::class)`，但 ThinkPHP 8 里 include 路由文件的是 `Http::loadRoutes()`（只在 HTTP 派发路径上执行），`RouteLoaded` 只是「加载完毕」的通知、监听者仅来自服务包的 `Service::loadRoutesFrom()`。于是 console 里只收得到 forge 自身的端点与管理器路由，应用业务路由一条都不进收集结果——配了 `aliases` 时直接抛 `[RF_BE_008]` 悬空别名退出。框架自带 `route:list` 之所以正常，是因为它自己 `scanRoute()` include 完才 trigger 事件。
+  - 修复：`list` / `types` / `gen` 统一先经新增的 `RouteFileLoader` 真实加载路由文件。加载姿势参照官方 `route:list`（目录取 `Http::getRoutePath()`、include 之后才 trigger 事件），但**刻意不跟**它两处破坏框架状态的动作（`Route::clear()`、`lazy(false)`）：对规则树只增不减、不重绑任何框架对象，加载结果只存在于当前进程。同一次扫描会被迭代多遍，故加载器由 `ForgeService` 绑成容器单例做进程内幂等（二次 include 会注册出**新的** `RuleItem` 对象，对象去重挡不住）。
+  - 连带修好：`route:forge:gen` 的幂等基准读的是实时名称表 `Route::getName(null)`，路由文件没进规则树时 `route/app.php` 里已有的名字查不到，存在重复生成风险——现在这条承诺才真正成立。
+  - 与 HTTP 严格同口径的两处取舍：`route/` **子目录**里的路由文件（框架按 `route_auto_group` 递归它们是 `route:list` 的展示福利）与 `app.with_route=false` 时连顶层文件都不加载，两者都**只给 warning、不悄悄多报**，守住「forge 看到的 == 运行时真在服务的」。warning 复用既有通道（STDERR 与 `list --json` 的 `warnings` 字段同现），只是数组元素新增，不改任何键与结构。
+  - 回归测试：新增 16 例，其中 6 例走「业务路由只来自真实路由文件」这条此前完全空白的路径（含别名目标写在路由文件里能解析、同进程连跑两条命令不产生重复条目）。本包 129 例全绿却漏掉该缺陷的根源，正是测试里的路由全部由测试代码直接 `Route::get()` 注册，已在 `AGENTS.md` 记为铁律。另在真实骨架应用 `route-forge-thinkphp-example` 做 A/B：修复后 `list` / `types` 得 `public 5 / client 4 / manage 2 / unassigned 1` + 2 条别名、`manage/logs`（有 tier 无 name）warning 仍在，HTTP 端点与管理器 API 数字一致；还原成 1.1.0 后旧症状复现。
+- **`route:forge:gen` 的产物不是合法 PHP**：`HEADER` 写在双引号串里多了一层转义，落盘成 `use think\\facade\\Route;`（两个连续反斜杠），生成的 `route/forge.auto.php` 直接 `ParseError`。而 `route/*.php` 在 HTTP 与 console 都会被 include，等于跑一次 gen 就把整个应用打挂；旧用例只对条目文本做字符串断言、从没加载过产物，所以缺陷长期隐身。现改用单引号串，并补「产物能被 `RouteFileLoader` 真实加载」的回归。
+  - **升级提示**：1.1.0 上已经跑过 gen 的项目，磁盘上那个坏文件不会被自动修正（本命令只增不删）。gen 现在会自动检出坏头部，并**早于加载**停下报错、给出可照抄的正确写法——按提示手工改那一行，或删掉该文件后重跑（命令幂等，条目会重新生成）。
+- **`route/` 下名为 `*.php` 的目录会让命令崩**：`glob('*.php')` 连目录一起匹配，`include` 目录只抛 `E_WARNING`，而 think 的 `Error` 初始化器把 warning 转成 `ErrorException`（例如 gen 写失败留下的同名占位目录）。加载器按官方 `route:list` 的判据（`DirectoryIterator` 且 `getType() === 'file'`）跳过非文件命中；不可读文件仍不静默跳过。
+
+### Added
+
+- **`src/Support/RouteFileLoader.php`**（内部支撑类）：console 侧唯一的路由文件加载入口，附 `warnings()` 输出「按运行时口径压根不会被加载」的结构性提示。公共契约未扩面——命令选项、端点与摘要结构、错误码集合均无变化。
+
 ## [1.1.0] - 2026-09-12
 
 ### Added
