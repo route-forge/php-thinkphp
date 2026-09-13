@@ -159,7 +159,9 @@ php think route:forge:gen
 
 #### 终端着色
 
-五条命令的提示语沿用 think console 的 `<info>` / `<comment>` / `<error>` 标签（层级统计、别名黄行、撞车红行同理）。think 自带的着色检测在 Windows 上有一条陈旧判据：它要求系统版本号**精确等于** `10.0.10586`（Win10 1511 的首发版号），且只认 `TERM` 严格等于 `xterm`——于是 Win11 与 Git Bash（`TERM=xterm-256color`）统统被判成「不支持颜色」，标签被剥成纯文本。本包在命令层重做这道判定（`ConsoleColorDetector`），使观感与 Laravel 版一致：
+五条命令的提示语沿用 think console 的 `<info>` / `<comment>` / `<error>` 标签（层级统计、失败提示同理）。`route:forge:list` 的表格行按语义着色——**未分配层级的路由整行品红**（一眼定位「该配 `->tier()` 却没配」），其下次要性依次是别名黄行、被别名指向的真实名绿、撞车声明红行，优先级 `unassigned` > 别名 > 默认；think 没有品红的具名样式，故该行用内联 `<fg=magenta>`。着色只作用于 table 形态，`--json` 与 TS 产物始终是纯文本。
+
+think 自带的着色检测在 Windows 上有一条陈旧判据：它要求系统版本号**精确等于** `10.0.10586`（Win10 1511 的首发版号），且只认 `TERM` 严格等于 `xterm`——于是 Win11 与 Git Bash（`TERM=xterm-256color`）统统被判成「不支持颜色」，标签被剥成纯文本。本包在命令层重做这道判定（`ConsoleColorDetector`），使观感与 Laravel 版一致：
 
 - Windows 下改为「版本号 ≥ 10.0.10586 **且** PHP 成功开启控制台 VT 模式」，并识别 Windows Terminal（`WT_SESSION`）、mintty / Git Bash（`MSYSCON`）、ConEmu、cmder 以及带后缀的 `TERM`；
 - `stdout` 不是终端（管道、重定向、CI）时一律不上色——`route:forge:list --json` 与 `route:forge:types` 的产物里永远不会混入 ANSI 转义码；

@@ -7,6 +7,7 @@ namespace RouteForge\ThinkPHP\Console;
 use InvalidArgumentException;
 use RouteForge\Common\Analyzer\RouteAnalyzer;
 use RouteForge\Common\Contract\ForgeExceptionContract;
+use RouteForge\Common\Repository\RouteRepository;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
 use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
 use RouteForge\ThinkPHP\Console\Concerns\ReportsCommandFailure;
@@ -22,8 +23,10 @@ use think\console\Output;
  * 列出所有命名路由的层级分配（含别名条目）。
  *
  * 对齐 Laravel 版 route:forge:list（SPEC §3.2）：
- *   - table 模式：别名整行黄色、被别名依赖的真实路由名绿色、
- *     撞车声明整行红色（think console <comment>/<info>/<error> 标签）；
+ *   - table 模式：未分配层级整行品红（快速定位「该配 tier 却没配」）、别名整行黄色、
+ *     被别名依赖的真实路由名绿色、撞车声明整行红色；
+ *     着色优先级 unassigned > 别名 > 默认。think console 只有具名标签
+ *     <comment>/<info>/<error>，品红无对应具名样式，故用内联 <fg=magenta>；
  *   - --json 模式：结构化对象，契约结构由 common RouteAnalyzer::listPayload 保证。
  *
  * think 差异：无独立 stderr 流，故警告与失败信息在 --json 时改走 STDERR 真流，
@@ -139,6 +142,16 @@ class RouteForgeListCommand extends Command
         $tableRows = array_map(function (array $r) use ($aliasedTargets): array {
             $methods = static fn (array $row): string => implode('|', RouteAnalyzer::withoutHead($row['methods']));
 
+            // 整行着色优先级：unassigned 品红（待分配层级的警告态）> 别名黄 > 默认。
+            // 品红覆盖别名黄时，别名身份仍由 Alias Of 列的文字表达，不依赖颜色。
+            // （仅 table 模式；JSON 输出保持纯文本契约不变。think 无 magenta 具名样式，用 fg= 内联写法）
+            if ($r['level'] === RouteRepository::UNASSIGNED_LEVEL) {
+                return $this->colorizeRow(
+                    [$r['name'], $r['level'], $methods($r), $r['uri'], (string) $r['alias_of']],
+                    'fg=magenta',
+                );
+            }
+
             // 别名整行黄色（仅 table 模式；JSON 输出保持纯文本契约不变）
             if ($r['alias_of'] !== null) {
                 return $this->colorizeRow(
@@ -188,6 +201,8 @@ class RouteForgeListCommand extends Command
 
     /**
      * 整行着色：包裹单元格文本（think console 标签，渲染为 ANSI 色）。
+     * $tag 既可是具名样式（comment/error），也可是内联样式串（fg=magenta）——
+     * think 的 Formatter 对 `</tag>` 与 `</>` 两种闭合形态都支持。
      *
      * @return string[]
      */

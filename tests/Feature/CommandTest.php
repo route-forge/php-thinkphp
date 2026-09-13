@@ -131,6 +131,52 @@ class CommandTest extends TestCase
         self::assertSame('unassigned', $payload['routes'][0]['level']);
     }
 
+    /**
+     * table 模式整行着色优先级：unassigned 品红 > 别名黄 > 默认（对齐 Laravel 版 fg=magenta）。
+     * 品红是「该配层级却没配」的肉眼信号，故指向 unassigned 的别名行也被品红覆盖，
+     * 别名身份退由 Alias Of 列文字表达；已分级路由的别名黄与绿色真实名不受影响。
+     * think 的 Buffer 驱动不过 Formatter，因此断言的是原始标签文本。
+     */
+    public function testListTableColorizesUnassignedRowsMagenta(): void
+    {
+        $app = $this->makeApp([
+            'aliases' => [
+                'legacy.misc'  => 'misc.ping',   // 目标未分级 → 品红覆盖别名黄
+                'legacy.login' => 'auth.login',  // 目标已分级 → 保持别名黄
+            ],
+        ]);
+
+        Route::get('misc', function () {
+            return 'misc';
+        })->name('misc.ping');
+
+        [$exit, $table] = $this->runCommand($app, 'route:forge:list');
+        self::assertSame(0, $exit);
+
+        // 未分级路由整行品红（Name 与 Level 列都被包裹）
+        self::assertStringContainsString('<fg=magenta>misc.ping</fg=magenta>', $table);
+        self::assertStringContainsString('<fg=magenta>unassigned</fg=magenta>', $table);
+
+        // 指向未分级路由的别名行同样是品红，且不再上别名黄；Alias Of 列文字仍在（品红不吞语义）
+        self::assertStringContainsString('<fg=magenta>legacy.misc</fg=magenta>', $table);
+        self::assertStringNotContainsString('<comment>legacy.misc</comment>', $table);
+        self::assertStringContainsString('<fg=magenta>misc.ping</fg=magenta>', $table);
+
+        // 已分级路由不着色，其别名行保持黄色（说明新增分支没有把黄色通道抢走）
+        self::assertStringNotContainsString('<fg=magenta>auth.login</fg=magenta>', $table);
+        self::assertStringNotContainsString('<fg=magenta>public</fg=magenta>', $table);
+        self::assertStringContainsString('<comment>legacy.login</comment>', $table);
+
+        // 着色只属于 table 形态：--json 产物必须是纯文本，不得混入标签
+        [$exit, $json] = $this->runCommand($app, 'route:forge:list', ['--json']);
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('fg=magenta', $json);
+        self::assertStringNotContainsString('<comment>', $json);
+        $names = array_column((array) json_decode($json, true)['routes'], 'name');
+        sort($names);
+        self::assertSame(['auth.login', 'legacy.login', 'legacy.misc', 'manage.users.index', 'misc.ping'], $names);
+    }
+
     public function testTypesJsonAndLevelFilter(): void
     {
         [$exit, $content] = $this->runCommand($this->makeApp(), 'route:forge:types', ['--json']);
