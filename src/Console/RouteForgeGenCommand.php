@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RouteForge\ThinkPHP\Console;
 
+use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
 use RouteForge\ThinkPHP\Support\AutoRouteScanner;
 use RouteForge\ThinkPHP\Support\RouteFileLoader;
 use think\console\Command;
@@ -28,6 +29,8 @@ use think\facade\Route;
  */
 class RouteForgeGenCommand extends Command
 {
+    use EnsuresAnsiOutput;
+
     /**
      * 生成文件的头部。`use` 那行**必须**用单引号串：双引号里想落一个反斜杠要写 `\\`，
      * 此前写成 `\\\\` 于是落盘成两个反斜杠，产物 `use think\\facade\\Route;` 直接
@@ -64,6 +67,8 @@ class RouteForgeGenCommand extends Command
 
     protected function execute(Input $input, Output $output)
     {
+        $this->ensureAnsiOutput($input, $output);
+
         return $this->app->invoke([$this, 'handle'], [$input, $output]);
     }
 

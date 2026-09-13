@@ -6,6 +6,7 @@ namespace RouteForge\ThinkPHP\Console;
 
 use RouteForge\Common\Cache\RouteCache;
 use RouteForge\Common\Repository\RouteRepository;
+use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
 use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
 use think\console\Command;
 use think\console\Input;
@@ -19,6 +20,7 @@ use think\console\Output;
  */
 class RouteForgeClearCommand extends Command
 {
+    use EnsuresAnsiOutput;
     use WarnsMissingConfig;
 
     protected function configure(): void
@@ -30,6 +32,8 @@ class RouteForgeClearCommand extends Command
 
     protected function execute(Input $input, Output $output)
     {
+        $this->ensureAnsiOutput($input, $output);
+
         return $this->app->invoke([$this, 'handle'], [$input, $output]);
     }
 

@@ -10,6 +10,7 @@ use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\Common\Repository\RouteRepository;
 use RouteForge\Common\Type\TypeGenerator;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
+use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
 use RouteForge\ThinkPHP\Console\Concerns\ReportsCommandFailure;
 use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
 use RouteForge\ThinkPHP\Support\RouteFileLoader;
@@ -28,6 +29,7 @@ use think\console\Output;
  */
 class RouteForgeTypesCommand extends Command
 {
+    use EnsuresAnsiOutput;
     use ReportsCommandFailure;
     use WarnsMissingConfig;
 
@@ -42,6 +44,8 @@ class RouteForgeTypesCommand extends Command
 
     protected function execute(Input $input, Output $output)
     {
+        $this->ensureAnsiOutput($input, $output);
+
         return $this->app->invoke([$this, 'handle'], [$input, $output]);
     }
 

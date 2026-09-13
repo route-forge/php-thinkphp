@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use RouteForge\Common\Analyzer\RouteAnalyzer;
 use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
+use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
 use RouteForge\ThinkPHP\Console\Concerns\ReportsCommandFailure;
 use RouteForge\ThinkPHP\Console\Concerns\WarnsMissingConfig;
 use RouteForge\ThinkPHP\Support\RouteFileLoader;
@@ -30,6 +31,7 @@ use think\console\Output;
  */
 class RouteForgeListCommand extends Command
 {
+    use EnsuresAnsiOutput;
     use ReportsCommandFailure;
     use WarnsMissingConfig;
 
@@ -45,6 +47,8 @@ class RouteForgeListCommand extends Command
 
     protected function execute(Input $input, Output $output)
     {
+        $this->ensureAnsiOutput($input, $output);
+
         return $this->app->invoke([$this, 'handle'], [$input, $output]);
     }
 

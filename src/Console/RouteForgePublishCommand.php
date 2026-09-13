@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RouteForge\ThinkPHP\Console;
 
+use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
 use RouteForge\ThinkPHP\Support\ConfigPublisher;
 use think\console\Command;
 use think\console\Input;
@@ -18,6 +19,8 @@ use think\console\Output;
  */
 class RouteForgePublishCommand extends Command
 {
+    use EnsuresAnsiOutput;
+
     protected function configure(): void
     {
         $this->setName('route:forge:publish')
@@ -27,6 +30,8 @@ class RouteForgePublishCommand extends Command
 
     protected function execute(Input $input, Output $output)
     {
+        $this->ensureAnsiOutput($input, $output);
+
         return $this->app->invoke([$this, 'handle'], [$input, $output]);
     }
 
