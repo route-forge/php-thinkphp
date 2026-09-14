@@ -5,6 +5,26 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.0] - 2026-09-14
+
+### Added
+
+- **`route:forge:list --unnamed`：全量未命名路由清单**：一行命令列出所有没有路由名的路由，既含「被层级规则命中却无名」的（这类本该出现在端点/`d.ts` 里，却因无名凭空消失），也含「未命中任何层级」的。走本视图时只打印清单、不再打印正常表格与 warnings，避免同一事实双写；退出码恒 0，是给人排查用的视图，不参与 CI 门禁。
+- **未命名路由不再静默消失**：以前只有「显式 `->tier()` 却无名」这一种形态会出 warning，靠 config `match` 或 `classifier` 归入层级的未命名路由完全静默，事后无从发现。现在扫描期对每条未命名路由做层级归属探测（永不抛异常，不新增失败模式），按命中来源给出对应说法并进入既有 `warnings` 通道（table 形态写 STDERR、`--json` 形态进 `warnings` 字段）。历史整句 `Route (…) has tier [x] but no route name assigned; …` 原样保留为连续子串（下游按整句 grep / substring 断言的脚本不受影响），只在句尾追加一列 HTTP 方法用于定位。**未命名且未命中任何层级的路由不进 `warnings`**——它压根与 forge 无关，否则「warnings 非空即配置有问题」的 CI 门禁会被无关路由长期打断，这类只在 `--unnamed` 视图出现。
+
+### Changed
+
+- **严格模式一次报全，HTTP 错误码聚合为 `RF_BE_009`**：`strict_mode` 下「命名路由未归级」原先逐条 fail-fast 抛 `RF_BE_001`（修一条刷一条）。现由依赖侧的全量违规预扫描在仓库取数入口接管，把「有层级归属却无路由名」（`missing_name`）与「命名路由未归级」（`unassigned`）两类一次性聚合并抛 `RF_BE_009`（HTTP 500），`message` 内含全量清单。层级名拼错、`classifier` 抛错等更精确的配置错误仍走各自错误码（`RF_BE_002` / `004` / `006`），fail-fast 不变。响应体仍只有 `code` / `message` / `level`，`violations` 结构化清单未进 HTTP 契约（属前后端契约扩面，未动）。
+- **命令行严格模式「只报问题」**：`route:forge:list` 发现严格模式违规时逐行以 `<error>` 打印红色清单并返回退出码 **1**，本分支下不再打印正常表格；`--json` 的 stdout 仍是纯 JSON 产物（契约不变），红色清单改走 STDERR，保证 `route:forge:list --json | jq` 拿到的永远是合法 JSON。`route:forge:types` 同口径：有违规时把清单写 STDERR、退出码 1，且**不再让未归级路由静默生成 `d.ts`**。
+- **依赖下限 `route-forge/common` `^1.1.2` → `^1.2.0`**：本包接线用上了 1.2.0 新增的 `TierResolver::probe`、`RouteNameFilter::isUriExcluded` / `withUriPrefixes`、`RouteAnalyzer` 的 `violations` / `unnamed`、`StrictViolationScanner` 与 `RF_BE_009`。`ForgeService` 把命令层（`RouteAnalyzer`）与仓库（`RouteRepository`）两处 `RouteNameFilter` 构造收进 `makeNameFilter()` 单点，并额外按 `endpoint_prefix` 追加 URI 排除——否则 forge 自身带 `endpoint_middleware` 的层级端点会被别的层级的 `match.middleware` 命中，包把自己报成配置错误。
+
+### 对外影响与升级
+
+- 对断言严格模式 HTTP 错误码的调用方：`strict_mode` 下命名路由未归级的错误码由 `RF_BE_001` 变为 `RF_BE_009`。旧码从未出现在本包对外文档（README / `llms.txt` / 配置注释），实际破坏面小，按「破坏面趋近零走 minor」的口径发 1.3.0 而非 major。
+- 对 CI：开启 `strict_mode` 时，`route:forge:list` / `types` 在存在未命名或未归级路由时退出码由 0 变 1——这正是严格模式该给的信号。未开 `strict_mode` 的项目行为不变。
+- 回归测试：新增 `tests/Feature/UnnamedAndStrictCommandTest.php` 8 例（match/classifier 命中未命名进 `warnings`、未命中不进、`--unnamed` 视图不与表格双写、严格模式两类一次报全且红色、`--json` stdout 纯 JSON 且退出码 1、`types` 拒绝产出、自身端点不计入违规）；`TierAssignmentTest` 的严格模式用例改断 `RF_BE_009`。本包 157 → 165 例全绿（对**已发布的 `route-forge/common` 1.2.0** 实装后实测）。
+- 文档口径：SPEC 的 §3.1.4（未命名可见性）/ §3.2（`--unnamed`）/ §6.1（`RF_BE_009`）变更由独立 docs 文档站统一承载，不随本包 `.docs` 分发。
+
 ## [1.2.2] - 2026-09-13
 
 ### Added

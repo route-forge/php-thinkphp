@@ -78,7 +78,7 @@ Saving is stricter than the Laravel adapter: the existing `config/forge.php` is 
 ### Commands (think console)
 
 ```bash
-php think route:forge:list [--level=manage] [--json] [--unassigned] [--aliases]
+php think route:forge:list [--level=manage] [--json] [--unassigned] [--aliases] [--unnamed]
 php think route:forge:types [--level=admin] [--json] [--out=../frontend/src/types/forge-routes.d.ts]
 php think route:forge:clear [--level=manage]
 php think route:forge:publish [--force]   # copies default config into app config/forge.php
@@ -86,6 +86,10 @@ php think route:forge:gen [--module=a,b|*] [--path=DIR] [--namespace=NS] [--dry-
 ```
 
 Command messages use think console's `<info>` / `<comment>` / `<error>` tags. `route:forge:list` rows carry the same colour semantics as the Laravel adapter: a row whose level is `unassigned` is painted magenta end-to-end (think has no named magenta style, so the inline `<fg=magenta>` tag is used; the signal is "this route still needs a tier"), then alias rows yellow, aliased-target names green, collision rows red — priority `unassigned` > alias > default, and table mode only (`--json` / TS products stay plain). think's own colour probe is stale on Windows — it requires the OS build to be **exactly** `10.0.10586` and `TERM` to be exactly `xterm`, so Windows 11 and Git Bash (`TERM=xterm-256color`) always resolve to "no colour" and the tags get stripped to plain text. `ConsoleColorDetector` redoes that verdict at the command layer (Windows: build `>= 10.0.10586` **and** VT mode actually enabled, plus `WT_SESSION` / `MSYSCON` / `ConEmuANSI=ON` / prefixed `TERM` recognised as ANSI-capable third-party terminals). It stays deliberately conservative: no colour when stdout is not a terminal (so `--json` / `--out` products never contain escape codes), honours `NO_COLOR` and `TERM=dumb`, and never intervenes when the user passed `--ansi` or `--no-ansi` — `--ansi` is also the escape hatch to recommend when a terminal is so unusual that PHP cannot detect the console.
+
+**Unnamed-route visibility.** `route:forge:list --unnamed` prints the full list of routes with no name (both level-matched-but-unnamed and unmatched). A route that a config `match` rule or the `classifier` assigns to a level but that has no name is no longer silent — it surfaces through the existing `warnings` channel (STDERR in table mode, the `warnings` field under `--json`), with wording per hit source; the legacy explicit-tier sentence `Route (…) has tier [x] but no route name assigned; …` is preserved verbatim as a substring (an HTTP-method column is appended). Routes that are unnamed **and** match no level are deliberately kept **out** of `warnings` (so a "warnings non-empty ⇒ broken config" CI gate isn't tripped by irrelevant routes); they appear only in `--unnamed`. The filter used by both the command analyzer and the HTTP repository is built once in `ForgeService::makeNameFilter()` and excludes the endpoint URI prefix, so forge's own level/summary endpoints (which may carry `endpoint_middleware` matched by another level) are never reported as config errors.
+
+**Strict-mode violations aggregate.** Under `strict_mode`, `list`/`types` report every "should be in metadata but isn't" route at once instead of failing one-at-a-time: `list` prints a red (`<error>`) list and exits **1** without the normal table (under `--json`, stdout stays pure JSON and the list goes to STDERR); `types` writes the list to STDERR, exits 1, and refuses to emit `d.ts`. The HTTP endpoint returns 500 with code `RF_BE_009` (message contains the full list), superseding the per-route `RF_BE_001`; invalid tier names and classifier failures still fail fast with their own codes (`RF_BE_002` / `004` / `006`). Without `strict_mode`, unassigned named routes land in the `unassigned` level and command exit codes/products are unaffected.
 
 ### Inline summary (server-rendered HTML fast path)
 

@@ -57,7 +57,9 @@ return [
     // 缓存驱动；null 用默认驱动，可指定 'file' / 'redis' 等
     'cache_driver' => null,
 
-    // 严格模式：未命中层级即抛异常（true）或归入 unassigned 特殊层级（false）
+    // 严格模式：true 时把「命名路由未归级 / 有层级归属却无路由名」一次性聚合报告
+    //（HTTP 端点 500 + RF_BE_009；route:forge:list / types 退出码 1、只报问题、types 不再产出 d.ts）；
+    // false 时未归级的命名路由归入 unassigned 特殊层级，命令与产物不受影响。
     'strict_mode' => false,
 
     // 摘要端点响应格式版本号（schemeVersion 字段）

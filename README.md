@@ -144,6 +144,9 @@ URI 模板统一转换为 `{param}` / `{param?}` 语法（think 定义中的 `<i
 # 查看所有路由的层级分配（--level=manage / --json / --unassigned / --aliases）
 php think route:forge:list
 
+# 全量未命名路由清单（含被层级命中却无名的、以及未命中任何层级的）
+php think route:forge:list --unnamed
+
 # 生成 TS 类型声明（--level / --json / --out=../frontend/src/types/forge-routes.d.ts）
 php think route:forge:types
 
@@ -167,6 +170,14 @@ think 自带的着色检测在 Windows 上有一条陈旧判据：它要求系�
 - `stdout` 不是终端（管道、重定向、CI）时一律不上色——`route:forge:list --json` 与 `route:forge:types` 的产物里永远不会混入 ANSI 转义码；
 - 遵守 `NO_COLOR` 与 `TERM=dumb`；
 - 显式表态优先：命令带上 `--ansi` 或 `--no-ansi` 时本包完全不介入，判定交回框架。`--ansi` 同时是自动判定偏保守时的逃生舱——个别终端下 PHP 认不出控制台（判不出就宁可不上色，免得把 `←[32m` 这类乱码写进终端），加上它即可。
+
+#### 严格模式下的命令行为
+
+开启 `strict_mode` 后，`route:forge:list` 与 `route:forge:types` 会把「本该进入元信息却进不去」的路由一次性报全，而不是修一条刷一条：
+
+- `list`：发现违规时逐行以红色（`<error>`）打印清单并返回退出码 **1**，此时不再打印正常表格——命令行只报问题。加 `--json` 时 stdout 仍是**纯 JSON 产物**（契约不变），红色清单改走 STDERR，`route:forge:list --json | jq` 永远拿到合法 JSON；
+- `types`：有违规时清单写 STDERR、退出码 1，且不再让未归级路由静默生成 `d.ts`；
+- HTTP 端点：命名路由未归级、或有层级归属却无路由名时，聚合返回 500 与错误码 `RF_BE_009`（`message` 内含全量清单）。层级名拼错、`classifier` 抛错等更精确的问题仍各自返回 `RF_BE_002` / `004` / `006`。未开启 `strict_mode` 时，未归级命名路由照常归入 `unassigned` 特殊层级，命令退出码与产物不受影响。
 
 ### 路由别名（改名迁移 / 长期稳定对外名）
 
@@ -246,7 +257,7 @@ ThinkPHP 侧的落地差异：
 | `endpoint_middleware`| `string\|string[]` | `[]`       | 摘要端点中间件；数组或单个字符串都接受（`levels.*.endpoint_middleware` 同形），空数组 / `null` 不限制 |
 | `cache_ttl`          | `int\|null`    | `3600`             | 统一缓存 TTL（秒）；`null` 不缓存，`0` 永久缓存                       |
 | `cache_driver`       | `string\|null` | `null`             | think 缓存驱动（`file` / `redis` 等）；`null` 用默认驱动             |
-| `strict_mode`        | `bool`         | `false`            | 严格模式：未命中层级抛异常或归入 `unassigned`                        |
+| `strict_mode`        | `bool`         | `false`            | 严格模式：`true` 一次性聚合报告违规（HTTP 500 + `RF_BE_009`、命令退出码 1）；`false` 未命中层级归入 `unassigned`                     |
 | `scheme_version`     | `int`          | `1`                | 摘要端点 `schemeVersion`（格式版本，破坏性变更时递增）               |
 | `classifier`         | `callable\|null` | `null`           | 自定义分类回调 `fn(\think\route\RuleItem $r): ?string`               |
 | `aliases`            | `array`        | `[]`               | 别名映射表（键=别名，值=真实路由名）                                 |
