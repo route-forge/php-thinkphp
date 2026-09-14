@@ -131,7 +131,7 @@ class TierAssignmentTest extends TestCase
         self::assertSame('unassigned', $unassigned['level']);
     }
 
-    public function testStrictModeThrowsRfBe001(): void
+    public function testStrictModeThrowsRfBe009(): void
     {
         $app = AppFactory::create(debug: true, forgeOverrides: [
             'levels'      => self::LEVELS,
@@ -145,8 +145,13 @@ class TierAssignmentTest extends TestCase
         $response = Http::get($app, '/_forge/routes/unassigned');
         $payload = json_decode($response->getContent(), true);
 
+        // 严格模式不再逐条抛 RF_BE_001：仓库取数入口做全量预扫描，聚合为 RF_BE_009 一次报全。
         self::assertSame(500, $response->getCode());
-        self::assertSame('RF_BE_001', $payload['error']['code']);
+        self::assertSame('RF_BE_009', $payload['error']['code']);
+        // 命名路由未归级归入 unassigned 组，message 含该路由名与「未命中任何层级」措辞。
+        // 响应体只带 code/message/level（violations 结构化清单未进 HTTP 契约），故只断 message 文本。
+        self::assertStringContainsString('misc.ping', $payload['error']['message']);
+        self::assertStringContainsString('not matched by any level', $payload['error']['message']);
     }
 
     public function testExplicitTierNotInLevelsThrowsAtScan(): void

@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use RouteForge\Common\Analyzer\RouteAnalyzer;
 use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\Common\Repository\RouteRepository;
+use RouteForge\Common\Support\StrictViolationScanner;
 use RouteForge\Common\Type\TypeGenerator;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
 use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
@@ -90,6 +91,16 @@ class RouteForgeTypesCommand extends Command
             // 结构性提示（route/ 子目录、app.with_route=false）：types 侧只走 STDERR，产物仍是纯 d.ts/JSON
             $loader->warnings(),
         );
+
+        // 严格模式违规：不再让未归级路由静默生成 d.ts——清单走 STDERR（types 的 stdout 恒为
+        // d.ts/JSON 产物，不能污染），退出码 1，且不产出任何类型文件。与 list 命令同口径。
+        if (StrictViolationScanner::count($analysis['violations']) > 0) {
+            foreach (StrictViolationScanner::format($analysis['violations']) as $line) {
+                fwrite(STDERR, $line . PHP_EOL);
+            }
+
+            return 1;
+        }
 
         // 目标层级：全部已配置层级（--level 时仅该层级），空层级由
         // TypeGenerator::collectTargets() 预置，保证 ForgeLevel 联合类型完整

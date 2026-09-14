@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use RouteForge\Common\Analyzer\RouteAnalyzer;
 use RouteForge\Common\Contract\ForgeExceptionContract;
 use RouteForge\Common\Repository\RouteRepository;
+use RouteForge\Common\Support\StrictViolationScanner;
 use RouteForge\ThinkPHP\Adapter\ThinkRouteNormalizer;
 use RouteForge\ThinkPHP\Console\Concerns\EnsuresAnsiOutput;
 use RouteForge\ThinkPHP\Console\Concerns\ReportsCommandFailure;
@@ -45,6 +46,7 @@ class RouteForgeListCommand extends Command
             ->addOption('json', null, Option::VALUE_NONE, '输出 JSON 格式')
             ->addOption('unassigned', null, Option::VALUE_NONE, '仅列出未分配层级的路由')
             ->addOption('aliases', null, Option::VALUE_NONE, '仅列出别名条目（旧名 → 真实路由名）')
+            ->addOption('unnamed', null, Option::VALUE_NONE, '仅列出未命名路由（含未归级的命名路由）')
             ->setDescription('列出所有命名路由的层级分配（route:forge:list --level=admin --json --unassigned）');
     }
 
@@ -105,6 +107,38 @@ class RouteForgeListCommand extends Command
         $aliases  = $analysis['aliases'];
         $rows     = $analyzer->filterRows($analysis['rows'], $filterLevel, $onlyUnassigned, $onlyAliases);
         $payload  = $analyzer->listPayload($levels, $rows, $analysis['tier_counts'], $warnings, $filterLevel, $onlyUnassigned, $onlyAliases);
+
+        // --unnamed 视图：只列未命名路由（含被层级命中却无名的，以及未命中任何层级的），
+        // 不与正常表格 / warnings 双写同一事实，退出码 0——这是人工排查视图，不参与 CI 门禁。
+        if ($input->getOption('unnamed')) {
+            foreach (RouteAnalyzer::formatUnnamed($analysis['unnamed'], $levels, $filterLevel) as $line) {
+                $output->writeln($line);
+            }
+
+            return 0;
+        }
+
+        // 严格模式违规：命令行「只报问题」——红色清单逐行，本分支下不再打印正常表格。
+        // --json 的 stdout 必须仍是纯 JSON 产物（契约不变），故红色清单在 --json 下改写
+        // STDERR（复用 printWarnings 的既有做法：think Output 无独立 stderr 流，直写常量），
+        // 保证 `route:forge:list --json | jq` 拿到的永远是合法 JSON。
+        if (StrictViolationScanner::count($analysis['violations']) > 0) {
+            $lines = StrictViolationScanner::format($analysis['violations']);
+
+            if ($asJson) {
+                $output->writeln(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+                foreach ($lines as $line) {
+                    fwrite(STDERR, $line . PHP_EOL);
+                }
+            } else {
+                foreach ($lines as $line) {
+                    $output->writeln('<error>' . $line . '</error>');
+                }
+            }
+
+            return 1;
+        }
 
         // JSON 输出（结构化对象，便于脚本消费）
         if ($asJson) {

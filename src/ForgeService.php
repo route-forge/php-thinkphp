@@ -167,12 +167,34 @@ class ForgeService extends Service
     }
 
     /**
+     * 路由名/URI 排除过滤器：命令层（list / types）与仓库（HTTP 端点）必须用同一份，
+     * 否则两处口径分叉——此前两个 new 分别构造就是漂移源头。
+     *
+     * 排除两类：
+     *   1. 框架内部路由前缀（__think_auto_route__）与 forge 自身端点名前缀
+     *      （RouteNameFilter::FORGE_PREFIXES，随 withExtraPrefixes 一并带上）；
+     *   2. forge 自身端点的 URI 前缀（endpoint_prefix，如 /_forge/routes）。
+     *      未命名路由只能按 URI 排除：层级端点带 endpoint_middleware 时会被别的
+     *      层级的 match.middleware 命中，不靠 URI 排除，包就会把自身端点报成
+     *      「未命名路由落进层级」的配置错误（RouteAnalyzer / StrictViolationScanner 同口径）。
+     */
+    protected function makeNameFilter(): RouteNameFilter
+    {
+        return RouteNameFilter::withExtraPrefixes(self::FRAMEWORK_EXCLUDED_PREFIXES)
+            ->withUriPrefixes([
+                CommonRouteRepository::normalizeEndpointPrefix(
+                    (string) $this->config('endpoint_prefix', '/_forge/routes'),
+                ),
+            ]);
+    }
+
+    /**
      * RouteAnalyzer：命令层（list / types）共用分析器。
      * 框架内部路由排除规则（__think_auto_route__）在此单点声明。
      */
     protected function makeRouteAnalyzer(): RouteAnalyzer
     {
-        $filter = RouteNameFilter::withExtraPrefixes(self::FRAMEWORK_EXCLUDED_PREFIXES);
+        $filter = $this->makeNameFilter();
 
         return new RouteAnalyzer(
             tierResolver: $this->app->make(CommonTierResolver::class),
@@ -204,7 +226,7 @@ class ForgeService extends Service
                 'cache_ttl'       => $this->config('cache_ttl'),
                 'scheme_version'  => $this->config('scheme_version', CommonRouteRepository::SCHEME_VERSION),
             ],
-            filter: RouteNameFilter::withExtraPrefixes(self::FRAMEWORK_EXCLUDED_PREFIXES),
+            filter: $this->makeNameFilter(),
         );
     }
 
